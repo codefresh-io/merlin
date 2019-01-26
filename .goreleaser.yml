@@ -1,0 +1,42 @@
+builds:
+- env:
+  - CGO_ENABLED=0
+  goos:
+    - darwin
+    - linux
+    - windows
+  ldflags:
+  - -X github.com/codefresh-io/merlin/cmd.version={{.Version}} -X github.com/codefresh-io/merlin/cmd.commit={{.Commit}} -X github.com/codefresh-io/merlin/cmd.date={{.Date}}
+archive:
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+  format_overrides:
+  - goos: windows
+    format: zip
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+brew:
+  github:
+    owner: codefresh-io
+    name: homebrew-venona
+  folder: Formula
+  description: "venona --help"
+  homepage: "http://docs.codefresh.io"
+  commit_author:
+    name: Oleg Sucharevich
+    email: olegs@codefresh.io
+
+  install: |
+      bin.install "venona"

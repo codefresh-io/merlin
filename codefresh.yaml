@@ -1,0 +1,28 @@
+version: '1.0'
+mode: parallel
+stages:
+- Build & Test
+steps:
+  calculate_version:
+    title: 'Calculate latest version'
+    image: codefresh/cli
+    commands:
+        - export VERSION=$(cat VERSION)
+        - cf_export VERSION
+    when:
+      steps:
+      - name: main_clone
+        on:
+        - success
+ 
+  build:
+    title: "Building production image"
+    type: build
+    stage: Build & Test
+    tag: ${{CF_BRANCH_TAG_NORMALIZED}}
+    image_name: codefresh/venona
+    when:
+      steps:
+      - name: install_dependencies
+        on:
+        - success
