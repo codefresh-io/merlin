@@ -17,6 +17,8 @@ limitations under the License.
 */
 
 import (
+	"errors"
+
 	"github.com/codefresh-io/merlin/pkg/config"
 	"github.com/codefresh-io/merlin/pkg/github"
 	"github.com/codefresh-io/merlin/pkg/logger"
@@ -27,16 +29,22 @@ import (
 var c = &config.Config{}
 
 var configCmd = &cobra.Command{
-	Use:   "init",
+	Use:   "init [name]",
 	Short: "Create config file",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			dieIfError(errors.New("Name is required"))
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
+		c.Name = args[0]
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
 				"Command": "Create",
 			},
 			Debug: verbose,
 		})
-		c.Name = c.Kube.Namespace
 		if merlinconfig == "" {
 			err := ensureLocalDirectory(c)
 			dieIfError(err)
@@ -59,7 +67,6 @@ var configCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(configCmd)
 
-	//make sure the path has relative prefix, or add it (--path codefresh.yaml will not have full path)
 	configCmd.Flags().StringVar(&c.Codefresh.Context, "codefresh-config-context", "", "Set name the context name in codefresh config to use")
 	configCmd.Flags().StringVar(&c.Codefresh.Path, "codefresh-config-path", "", "Set path to codefresh config")
 	configCmd.Flags().StringVar(&c.Kube.Context, "kube-config-context", "", "Set name the in kubeconfig to use")
