@@ -24,11 +24,11 @@ import (
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print Venona version",
+	Short: "Print merlin version",
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
-				"Command": "Versions",
+				"Command": "Version",
 			},
 			Debug: verbose,
 		})
