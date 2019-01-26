@@ -27,16 +27,3 @@ changelog:
     exclude:
     - '^docs:'
     - '^test:'
-brew:
-  github:
-    owner: codefresh-io
-    name: homebrew-venona
-  folder: Formula
-  description: "venona --help"
-  homepage: "http://docs.codefresh.io"
-  commit_author:
-    name: Oleg Sucharevich
-    email: olegs@codefresh.io
-
-  install: |
-      bin.install "venona"
