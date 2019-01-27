@@ -29,3 +29,23 @@ Use "merlin [command] --help" for more information about a command.
 * Install latest release from [here](https://github.com/codefresh-io/merlin/releases)
 
 * Create merlin config by running `merlin init [name]`, provide all required flags
+ ```
+  merlin init --help
+ ```
+
+ * Create your environment
+ ```
+  merlin create [NAME]
+ ```
+
+ ## Example
+ Debug cfapi
+ * Connect to cfapi
+ ```
+  merlin run connect --component cfapi
+ ```
+
+ * Start cfapi service locally
+ ```
+  merlin run start --component cfapi
+ ```
