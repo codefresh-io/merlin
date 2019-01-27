@@ -22,7 +22,6 @@ import (
 	"github.com/codefresh-io/merlin/pkg/config"
 	"github.com/codefresh-io/merlin/pkg/github"
 	"github.com/codefresh-io/merlin/pkg/logger"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
