@@ -69,11 +69,6 @@ func createConfigFile(c *config.Config, merlinconfig string) error {
 	c.Kube.Path, err = filepath.Abs(c.Kube.Path)
 	dieIfError(err)
 
-	if c.Github.PemFilePath != "" {
-		c.Github.PemFilePath, err = filepath.Abs(c.Github.PemFilePath)
-		dieIfError(err)
-	}
-
 	var filePath string
 	if merlinconfig == "" {
 		filePath = fmt.Sprintf("%s/%s/%s.%s", home, config.MerlinFilePath, config.MerlinFileName, config.MerlinFileExtention)
