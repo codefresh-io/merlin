@@ -54,7 +54,7 @@ steps:
         - master
 
   release_binaries:
-    title: Create release in Github with venona CLI
+    title: Create release in Github with merlin CLI
     image: goreleaser/goreleaser
     stage: Release
     fail_fast: false
