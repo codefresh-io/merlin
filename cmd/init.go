@@ -24,6 +24,7 @@ import (
 	"github.com/codefresh-io/merlin/pkg/logger"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var c = &config.Config{}
