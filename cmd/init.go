@@ -39,6 +39,7 @@ var configCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		c.Name = args[0]
+		c.Kube.Namespace = args[0]
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
 				"Command": "Create",
@@ -67,11 +68,20 @@ var configCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(configCmd)
 
-	configCmd.Flags().StringVar(&c.Codefresh.Context, "codefresh-config-context", "", "Set name the context name in codefresh config to use")
-	configCmd.Flags().StringVar(&c.Codefresh.Path, "codefresh-config-path", "", "Set path to codefresh config")
-	configCmd.Flags().StringVar(&c.Kube.Context, "kube-config-context", "", "Set name the in kubeconfig to use")
-	configCmd.Flags().StringVar(&c.Kube.Path, "kube-config-path", "", "Set path to kubeconfig")
-	configCmd.Flags().StringVar(&c.Kube.Namespace, "kube-config-namespace", "", "Set name for the environment")
-	configCmd.Flags().StringVar(&c.Github.Token, "github-token", "", "Set token to github")
-	configCmd.Flags().StringVar(&c.Environment.Path, "environment-descriptor", "", "Set path to environment descriptor")
+	viper.BindEnv("kubeconfig", "KUBECONFIG")
+	viper.BindEnv("cfconfig", "CFCONFIG")
+	viper.BindEnv("github", "GITHUB_TOKEN")
+
+	configCmd.Flags().StringVar(&c.Codefresh.Context, "codefresh-config-context", "", "Set name the context name in codefresh config to use (required)")
+	configCmd.Flags().StringVar(&c.Codefresh.Path, "codefresh-config-path", viper.GetString("cfconfig"), "Set path to codefresh config [$CFCONFIG]")
+	configCmd.Flags().StringVar(&c.Kube.Context, "kube-config-context", "", "Set name the in kubeconfig to use (required)")
+	configCmd.Flags().StringVar(&c.Kube.Path, "kube-config-path", viper.GetString("kubeconfig"), "Set path to kubeconfig [$KUBECONFIG] (default: $HOME/.kube/config)")
+	configCmd.Flags().StringVar(&c.Github.Token, "github-token", viper.GetString("github"), "Set token to github [$GITHUB_TOKEN]")
+	configCmd.Flags().StringVar(&c.Environment.Path, "environment-descriptor", "", "Set path to environment descriptor (default is from github)")
+
+	rootCmd.MarkFlagRequired("codefresh-config-context")
+	rootCmd.MarkFlagRequired("codefresh-config-path")
+	rootCmd.MarkFlagRequired("kube-config-context")
+	rootCmd.MarkFlagRequired("kube-config-path")
+	rootCmd.MarkFlagRequired("github-token")
 }

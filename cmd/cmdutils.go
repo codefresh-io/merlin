@@ -64,9 +64,19 @@ func createConfigFile(c *config.Config, merlinconfig string) error {
 		c.Environment.Git.Revision = "master"
 	}
 	dieIfError(err)
-	c.Codefresh.Path, err = filepath.Abs(c.Codefresh.Path)
+
+	if c.Codefresh.Path == "" {
+		c.Codefresh.Path, err = filepath.Abs(fmt.Sprintf("%s/.cfconfig", home))
+	} else {
+		c.Codefresh.Path, err = filepath.Abs(c.Codefresh.Path)
+	}
 	dieIfError(err)
-	c.Kube.Path, err = filepath.Abs(c.Kube.Path)
+
+	if c.Kube.Path == "" {
+		c.Kube.Path, err = filepath.Abs(fmt.Sprintf("%s/.kube/config", home))
+	} else {
+		c.Kube.Path, err = filepath.Abs(c.Kube.Path)
+	}
 	dieIfError(err)
 
 	var filePath string
