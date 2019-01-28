@@ -112,7 +112,7 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 	for _, v := range component.Values {
 		curr := map[string]interface{}{}
 		if v.Path != "" {
-			e.log.Debugf("Reading component template file from: %s", v.Path)
+			e.log.Debugf("Reading value files from: %s", v.Path)
 			content, err := ioutil.ReadFile(v.Path)
 			if err != nil {
 				return nil, err
@@ -123,16 +123,16 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 			}
 			mergeValues(base, curr)
 		} else {
+			git := v.Git
 			e.log.WithFields(map[string]interface{}{
-				"Owner":    v.Git.Owner,
-				"Repo":     v.Git.Repo,
-				"Revision": v.Git.Revision,
-			}).Debugf("Reading component template from git : %s", v.Git.Path)
+				"Owner":    git.Owner,
+				"Repo":     git.Repo,
+				"Revision": git.Revision,
+			}).Debugf("Reading value files from git : %s", git.Path)
 			g, err := github.New(e.config.Github.Token, e.log)
 			if err != nil {
 				return nil, err
 			}
-			git := v.Git
 			content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
 			if err != nil {
 				return nil, err
