@@ -23,6 +23,7 @@ import (
 	"github.com/codefresh-io/merlin/pkg/logger"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -62,7 +63,9 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
+	viper.BindEnv("component", "MERLIN_COMPONENT")
+
 	rootCmd.AddCommand(runCmd)
 	runCmd.Flags().StringArrayVar(&set, "set", nil, "Set value to override")
-	runCmd.Flags().StringVar(&component, "component", "", "Set name of the component where the command exist")
+	runCmd.Flags().StringVar(&component, "component", viper.GetString("component"), "Set name of the component where the command exist [$MERLIN_COMPONENT]")
 }

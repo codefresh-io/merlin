@@ -180,6 +180,7 @@ func (e *env) Run(opt *RunCommandOptions) error {
 	dataSource := make(map[string]interface{})
 
 	for _, value := range opt.Override {
+		logger.Debugf("Recieved overwrite value: %s", value)
 		if err := strvals.ParseInto(value, base); err != nil {
 			return fmt.Errorf("failed parsing --set data: %s", err)
 		}
@@ -224,7 +225,7 @@ func (e *env) Run(opt *RunCommandOptions) error {
 		logger.WithFields(map[string]interface{}{
 			"Command": cmd.Name,
 		}).Debugf("%s %v", cmd.Program, cmd.Args)
-		err = commander.New(cmd.Program, cmd.Args, cmd.Env).Run()
+		err = commander.New(cmd.Program, cmd.Args, append(cmd.Env, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))).Run()
 		if err != nil {
 			return err
 		}
