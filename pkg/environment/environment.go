@@ -11,6 +11,7 @@ import (
 
 	"github.com/codefresh-io/merlin/pkg/template"
 
+	"github.com/codefresh-io/merlin/pkg/cache"
 	"github.com/codefresh-io/merlin/pkg/codefresh"
 	"github.com/codefresh-io/merlin/pkg/commander"
 	"github.com/codefresh-io/merlin/pkg/config"
@@ -27,12 +28,14 @@ type (
 	env struct {
 		config *config.Config
 		log    *logrus.Entry
+		cache  cache.Cache
 	}
 
 	RunCommandOptions struct {
 		Component string
 		Override  []string
 		Command   string
+		SkipExec  bool
 	}
 
 	CreateOptions struct {
@@ -40,8 +43,8 @@ type (
 	}
 )
 
-func Build(c *config.Config, log *logrus.Entry) Environment {
-	return &env{c, log}
+func Build(c *config.Config, cache cache.Cache, log *logrus.Entry) Environment {
+	return &env{c, log, cache}
 }
 
 func (e *env) Create(opt *CreateOptions) error {
@@ -51,7 +54,7 @@ func (e *env) Create(opt *CreateOptions) error {
 	if err != nil {
 		return err
 	}
-	logger.Debug("Namespace is not exist!")
+	logger.Debug("Namespace does not exist!")
 	return codefresh.CreateEnvironment(&codefresh.Options{
 		Name:   opt.Name,
 		Config: e.config,
@@ -59,49 +62,76 @@ func (e *env) Create(opt *CreateOptions) error {
 }
 
 func (e *env) readEnvironmentDescriptor() (*config.EnvironmentDescriptor, error) {
+	desc := config.EnvironmentDescriptor{}
 	if e.config.Environment.Path != "" {
 		e.log.Debugf("Reading environment descriptor from: %s", e.config.Environment.Path)
-		return config.ReadEnvironmentDescriptor(e.config.Environment.Path)
+		desc, err := config.ReadEnvironmentDescriptor(e.config.Environment.Path)
+		if err != nil {
+			return nil, err
+		}
+		e.log.Debug("Saving to cache")
+		e.cache.Put("environment.path", desc)
+		return desc, nil
+
 	} else {
 		e.log.WithFields(map[string]interface{}{
 			"Owner":    e.config.Environment.Git.Owner,
 			"Repo":     e.config.Environment.Git.Repo,
 			"Revision": e.config.Environment.Git.Revision,
 		}).Debugf("Reading environment descriptor git , path: %s", e.config.Environment.Git.Path)
-		g, err := github.New(e.config.Github.Token, e.log)
-		if err != nil {
-			return nil, err
-		}
+
 		git := e.config.Environment.Git
-		content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
-		if err != nil {
-			return nil, err
+		key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
+		if err := e.cache.Get(key, &desc); err != nil {
+			g, err := github.New(e.config.Github.Token, e.log)
+			if err != nil {
+				return nil, err
+			}
+			content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
+			if err != nil {
+				return nil, err
+			}
+			descriptor := &config.EnvironmentDescriptor{}
+			err = yaml.Unmarshal(content, descriptor)
+			if err != nil {
+				return nil, err
+			}
+			e.log.Debug("Saving environment to cache")
+			e.cache.Put(key, &descriptor)
+			return descriptor, nil
 		}
-		descriptor := &config.EnvironmentDescriptor{}
-		err = yaml.Unmarshal(content, descriptor)
-		return descriptor, err
+		e.log.Debug("Environment loaded from cache")
+		return &desc, nil
 	}
 }
 
 func (e *env) readComponentTemplate(component *config.ComponentDescriptor) ([]byte, error) {
+	content := []byte{}
 	if component.Spec.Path != "" {
 		e.log.Debugf("Reading component template file from: %s", component.Spec.Path)
 		return ioutil.ReadFile(component.Spec.Path)
 	} else {
-		e.log.WithFields(map[string]interface{}{
-			"Owner":    component.Spec.Git.Owner,
-			"Repo":     component.Spec.Git.Repo,
-			"Revision": component.Spec.Git.Revision,
-		}).Debugf("Reading component template from git : %s", component.Spec.Git.Path)
-		g, err := github.New(e.config.Github.Token, e.log)
-		if err != nil {
-			return nil, err
-		}
 		git := component.Spec.Git
-		content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
-		if err != nil {
-			return nil, err
+		key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
+		e.log.WithFields(map[string]interface{}{
+			"Owner":    git.Owner,
+			"Repo":     git.Repo,
+			"Revision": git.Revision,
+		}).Debugf("Reading component template from git : %s", git.Path)
+		if err := e.cache.Get(key, &content); err != nil {
+			g, err := github.New(e.config.Github.Token, e.log)
+			if err != nil {
+				return nil, err
+			}
+			content, err = g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
+			if err != nil {
+				return nil, err
+			}
+			e.log.Debug("Saving component template to cache")
+			e.cache.Put(key, &content)
+			return content, nil
 		}
+		e.log.Debug("Component template loaded from cache")
 		return content, nil
 
 	}
@@ -121,27 +151,35 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 			if err != nil {
 				return nil, err
 			}
-			mergeValues(base, curr)
+			base = mergeValues(base, curr)
 		} else {
+			content := []byte{}
 			git := v.Git
+			key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
 			e.log.WithFields(map[string]interface{}{
 				"Owner":    git.Owner,
 				"Repo":     git.Repo,
 				"Revision": git.Revision,
 			}).Debugf("Reading value files from git : %s", git.Path)
-			g, err := github.New(e.config.Github.Token, e.log)
-			if err != nil {
-				return nil, err
+			if err := e.cache.Get(key, &content); err != nil {
+				g, err := github.New(e.config.Github.Token, e.log)
+				if err != nil {
+					return nil, err
+				}
+				content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
+				if err != nil {
+					return nil, err
+				}
+				err = yaml.Unmarshal(content, &curr)
+				if err != nil {
+					return nil, err
+				}
+				e.log.Debug("Saving component values to cache")
+				e.cache.Put(key, &content)
+			} else {
+				e.log.Debug("Component values loaded from cache")
 			}
-			content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
-			if err != nil {
-				return nil, err
-			}
-			err = yaml.Unmarshal(content, &curr)
-			if err != nil {
-				return nil, err
-			}
-			mergeValues(base, curr)
+			base = mergeValues(base, curr)
 		}
 	}
 	return base, nil
@@ -177,15 +215,16 @@ func (e *env) Run(opt *RunCommandOptions) error {
 		return err
 	}
 
+	setValues := map[string]interface{}{}
 	dataSource := make(map[string]interface{})
 
 	for _, value := range opt.Override {
 		logger.Debugf("Recieved overwrite value: %s", value)
-		if err := strvals.ParseInto(value, base); err != nil {
+		if err := strvals.ParseInto(value, setValues); err != nil {
 			return fmt.Errorf("failed parsing --set data: %s", err)
 		}
 	}
-	dataSource["Values"] = base
+	dataSource["Values"] = mergeValues(base, setValues)
 
 	system := make(map[string]interface{})
 	jc, err := convertStruct(e.config)
@@ -225,9 +264,13 @@ func (e *env) Run(opt *RunCommandOptions) error {
 		logger.WithFields(map[string]interface{}{
 			"Command": cmd.Name,
 		}).Debugf("%s %v", cmd.Program, cmd.Args)
-		err = commander.New(cmd.Program, cmd.Args, append(cmd.Env, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))).Run()
-		if err != nil {
-			return err
+		if opt.SkipExec {
+			logger.Debugf("Skipping execution, actual command:\n%v", append([]string{cmd.Program}, cmd.Args...))
+		} else {
+			err = commander.New(cmd.Program, cmd.Args, append(cmd.Env, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))).Run()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return err
