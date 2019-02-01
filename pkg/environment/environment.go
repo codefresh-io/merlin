@@ -153,7 +153,6 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 			}
 			base = mergeValues(base, curr)
 		} else {
-			content := []byte{}
 			git := v.Git
 			key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
 			e.log.WithFields(map[string]interface{}{
@@ -161,7 +160,7 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 				"Repo":     git.Repo,
 				"Revision": git.Revision,
 			}).Debugf("Reading value files from git : %s", git.Path)
-			if err := e.cache.Get(key, &content); err != nil {
+			if err := e.cache.Get(key, &curr); err != nil {
 				g, err := github.New(e.config.Github.Token, e.log)
 				if err != nil {
 					return nil, err
@@ -175,7 +174,7 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 					return nil, err
 				}
 				e.log.Debug("Saving component values to cache")
-				e.cache.Put(key, &content)
+				e.cache.Put(key, &curr)
 			} else {
 				e.log.Debug("Component values loaded from cache")
 			}
@@ -224,7 +223,8 @@ func (e *env) Run(opt *RunCommandOptions) error {
 			return fmt.Errorf("failed parsing --set data: %s", err)
 		}
 	}
-	dataSource["Values"] = mergeValues(base, setValues)
+	base = mergeValues(base, setValues)
+	dataSource["Values"] = base
 
 	system := make(map[string]interface{})
 	jc, err := convertStruct(e.config)
