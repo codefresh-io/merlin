@@ -35,7 +35,9 @@ var createEnvironmentCmd = &cobra.Command{
 			Debug: verbose,
 		})
 		c := readConfigFromPathOrDie(log)
-		err := environment.Build(c, log).Create(&environment.CreateOptions{
+		store := createCacheStore(c, false, log)
+		defer store.Persist()
+		err := environment.Build(c, store, log).Create(&environment.CreateOptions{
 			Name: c.Name,
 		})
 		dieIfError(err)

@@ -35,6 +35,9 @@ type (
 			Token       string `yaml:"token"`
 			PemFilePath string `yaml:"pemFilePath"`
 		} `yaml:"github"`
+		Cache struct {
+			Path string `yaml:"path"`
+		} `yaml:"cache"`
 	}
 
 	EnvironmentDescriptor struct {

@@ -9,6 +9,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/codefresh-io/merlin/pkg/cache"
 	"github.com/codefresh-io/merlin/pkg/config"
 	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/sirupsen/logrus"
@@ -101,4 +102,12 @@ func converStringIntoMap(set []string) (map[string]string, error) {
 		res[key] = strings.Join(val, "=")
 	}
 	return res, nil
+}
+
+func createCacheStore(c *config.Config, noCache bool, log *logrus.Entry) cache.Cache {
+	return cache.New(&cache.Options{
+		Path:    c.Cache.Path,
+		Logger:  log,
+		NoCache: noCache,
+	})
 }
