@@ -57,7 +57,7 @@ var configCmd = &cobra.Command{
 			dieIfError(err)
 		} else {
 			g := c.Environment.Git
-			git, err := github.New(c.Github.Token, log)
+			git := github.New(c.Github.Token, log)
 			dieIfError(err)
 			_, err = git.ReadFile(g.Owner, g.Repo, g.Path, g.Revision)
 			dieIfError(err)

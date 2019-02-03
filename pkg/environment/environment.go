@@ -83,10 +83,7 @@ func (e *env) readEnvironmentDescriptor() (*config.EnvironmentDescriptor, error)
 		git := e.config.Environment.Git
 		key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
 		if err := e.cache.Get(key, &desc); err != nil {
-			g, err := github.New(e.config.Github.Token, e.log)
-			if err != nil {
-				return nil, err
-			}
+			g := github.New(e.config.Github.Token, e.log)
 			content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
 			if err != nil {
 				return nil, err
@@ -119,10 +116,7 @@ func (e *env) readComponentTemplate(component *config.ComponentDescriptor) ([]by
 			"Revision": git.Revision,
 		}).Debugf("Reading component template from git : %s", git.Path)
 		if err := e.cache.Get(key, &content); err != nil {
-			g, err := github.New(e.config.Github.Token, e.log)
-			if err != nil {
-				return nil, err
-			}
+			g := github.New(e.config.Github.Token, e.log)
 			content, err = g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
 			if err != nil {
 				return nil, err
@@ -161,10 +155,7 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 				"Revision": git.Revision,
 			}).Debugf("Reading value files from git : %s", git.Path)
 			if err := e.cache.Get(key, &curr); err != nil {
-				g, err := github.New(e.config.Github.Token, e.log)
-				if err != nil {
-					return nil, err
-				}
+				g := github.New(e.config.Github.Token, e.log)
 				content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
 				if err != nil {
 					return nil, err
