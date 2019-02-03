@@ -17,6 +17,10 @@ limitations under the License.
 */
 
 import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/codefresh-io/merlin/pkg/github"
 	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/spf13/cobra"
 )
@@ -32,11 +36,17 @@ var versionCmd = &cobra.Command{
 			},
 			Debug: verbose,
 		})
-		log.WithFields(map[string]interface{}{
-			"Version": version,
-			"Commit":  commit,
-			"Date":    date,
-		}).Info("Version:")
+		c := readConfigFromPathOrDie(log)
+		git := github.New(c.Github.Token, log)
+		v := map[string]interface{}{
+			"Version":        version,
+			"Commit":         commit,
+			"Date":           date,
+			"Latest_Version": git.GetLatestVersion(),
+		}
+		b, err := json.Marshal(v)
+		dieIfError(err)
+		fmt.Println(string(b))
 	},
 }
 

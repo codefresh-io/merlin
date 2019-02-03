@@ -4,15 +4,21 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-github/v21/github"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
+const (
+	DefaultVersion = "latest"
+)
+
 type (
 	Github interface {
 		ReadFile(owner string, repo string, path string, revision string) ([]byte, error)
+		GetLatestVersion() string
 	}
 
 	git struct {
@@ -21,7 +27,7 @@ type (
 	}
 )
 
-func New(token string, log *logrus.Entry) (Github, error) {
+func New(token string, log *logrus.Entry) Github {
 	var tc *http.Client
 
 	if token != "" {
@@ -37,7 +43,7 @@ func New(token string, log *logrus.Entry) (Github, error) {
 	return &git{
 		client: client,
 		log:    log,
-	}, nil
+	}
 }
 
 func (g *git) ReadFile(owner string, repo string, path string, revision string) ([]byte, error) {
@@ -51,4 +57,20 @@ func (g *git) ReadFile(owner string, repo string, path string, revision string) 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(reader)
 	return buf.Bytes(), nil
+}
+
+func (g *git) GetLatestVersion() string {
+	version := DefaultVersion
+	releases, _, err := g.client.Repositories.ListReleases(context.Background(), "codefresh-io", "merlin", &github.ListOptions{})
+	if err != nil {
+		g.log.Errorf("Request to get latest version of venona been rejected , setting version to latest. Original error: %s", err.Error())
+		return version
+	}
+	for _, release := range releases {
+		name := strings.Split(*release.Name, "v")
+		if len(name) == 2 {
+			return name[1]
+		}
+	}
+	return version
 }
