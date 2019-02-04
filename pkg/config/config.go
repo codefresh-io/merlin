@@ -8,10 +8,6 @@ const (
 	MerlinFileName      = "merlin"
 	MerlinFileExtention = "yaml"
 	MerlinFilePath      = ".codefresh/.dev"
-
-	OperatorTypeAbstract = "abstract"
-	OperatorTypePipeline = "pipeline"
-	OperatorTypeCMD      = "cmd"
 )
 
 type (
