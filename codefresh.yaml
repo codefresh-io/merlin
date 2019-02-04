@@ -45,7 +45,7 @@ steps:
     fail_fast: false
     commands:
     - go mod download
-    - goreleaser release -f .goreleaser.yml --rm-dist --skip-publish
+    - goreleaser release -f .goreleaser.yml --rm-dist --skip-publish --skip-validate
     when:
       steps:
       - name: main_clone
@@ -60,7 +60,7 @@ steps:
     fail_fast: false
     commands:
     - go mod download
-    - goreleaser release -f .goreleaser.yml --rm-dist --skip-validate
+    - goreleaser release -f .goreleaser.yml --rm-dist
     when:
       steps:
       - name: create_git_tag
