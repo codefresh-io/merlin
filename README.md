@@ -33,6 +33,12 @@ Use "merlin [command] --help" for more information about a command.
  ```
 
  ## Example
+
+Show all commands that an environment provide
+```
+merlin list
+```
+
  Debug cfapi
  * Connect to cfapi
  ```
@@ -43,12 +49,3 @@ Use "merlin [command] --help" for more information about a command.
  ```
   merlin run start --component cfapi
  ```
-
-```yaml
-# How weight works
-# Merlin will find all operators that match to name {{NAME}}
-# from environment and from component related ( if passed )
-# Merlin will sort all of them using weight
-# Execution order is from the lowest to the highest weight
-# In case of operators with the same weight order is not deterministic
-```
