@@ -7,7 +7,6 @@ Usage:
   merlin [command]
 
 Available Commands:
-  create      A command line application for a Codefresh developer
   help        Help about any command
   init        Create config file
   run         Run command
@@ -33,11 +32,6 @@ Use "merlin [command] --help" for more information about a command.
   merlin init --help
  ```
 
- * Create your environment
- ```
-  merlin create [NAME]
- ```
-
  ## Example
  Debug cfapi
  * Connect to cfapi
@@ -49,3 +43,12 @@ Use "merlin [command] --help" for more information about a command.
  ```
   merlin run start --component cfapi
  ```
+
+```yaml
+# How weight works
+# Merlin will find all operators that match to name {{NAME}}
+# from environment and from component related ( if passed )
+# Merlin will sort all of them using weight
+# Execution order is from the lowest to the highest weight
+# In case of operators with the same weight order is not deterministic
+```

@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 
@@ -56,13 +55,14 @@ func readConfigFromPathOrDie(log *logrus.Entry) *config.Config {
 func createConfigFile(c *config.Config, merlinconfig string) error {
 	var err error
 	home := os.Getenv("HOME")
-	if c.Environment.Path != "" {
-		c.Environment.Path, err = filepath.Abs(c.Environment.Path)
+	if c.Environment.Spec.Path != "" {
+		c.Environment.Spec.Path, err = filepath.Abs(c.Environment.Spec.Path)
 	} else {
-		c.Environment.Git.Owner = "codefresh-io"
-		c.Environment.Git.Repo = "cf-helm"
-		c.Environment.Git.Path = "codefresh/env/dynamic/environment.yaml"
-		c.Environment.Git.Revision = "master"
+		g := c.Environment.Spec.Git
+		g.Owner = "codefresh-io"
+		g.Repo = "cf-helm"
+		g.Path = "codefresh/env/dynamic/environment.yaml.tmpl"
+		g.Revision = "master"
 	}
 	dieIfError(err)
 
@@ -91,17 +91,6 @@ func createConfigFile(c *config.Config, merlinconfig string) error {
 	dieIfError(err)
 	err = ioutil.WriteFile(filePath, res, 0644)
 	return err
-}
-
-func converStringIntoMap(set []string) (map[string]string, error) {
-	res := make(map[string]string)
-	for _, s := range set {
-		kv := strings.Split(s, "=")
-		key := kv[0]
-		val := kv[1:]
-		res[key] = strings.Join(val, "=")
-	}
-	return res, nil
 }
 
 func createCacheStore(c *config.Config, noCache bool, log *logrus.Entry) cache.Cache {

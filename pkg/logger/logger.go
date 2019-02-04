@@ -19,7 +19,7 @@ type (
 func New(opt *LoggerOptions) *logrus.Entry {
 	log := logrus.New()
 	if opt.Debug {
-		log.SetFormatter(&logrus.JSONFormatter{})
+		// log.SetFormatter(&logrus.JSONFormatter{})
 		log.AddHook(filename.NewHook())
 		log.SetLevel(logrus.DebugLevel)
 	}

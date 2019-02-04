@@ -19,31 +19,33 @@ limitations under the License.
 import (
 	"github.com/codefresh-io/merlin/pkg/environment"
 	"github.com/codefresh-io/merlin/pkg/logger"
+	"github.com/codefresh-io/merlin/pkg/table"
 	"github.com/spf13/cobra"
 )
 
-var name string
-
-var createEnvironmentCmd = &cobra.Command{
-	Use:   "create",
-	Short: "A command line application for a Codefresh developer",
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "Show a list of all commands exposed",
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
-				"Command": "Create",
+				"Command": "List",
 			},
 			Debug: verbose,
 		})
 		c := readConfigFromPathOrDie(log)
-		store := createCacheStore(c, false, log)
+		store := createCacheStore(c, noCache, log)
 		defer store.Persist()
-		err := environment.Build(c, store, log).Create(&environment.CreateOptions{
-			Name: c.Name,
-		})
+		res, err := environment.Build(c, store, log).List(nil)
 		dieIfError(err)
+		t := table.New(&table.Options{
+			Headers: []string{"Type", "Level", "Name", "Description"},
+		})
+		t.Table().AppendBulk(res)
+		t.Table().Render()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(createEnvironmentCmd)
+	rootCmd.AddCommand(listCmd)
 }
