@@ -227,7 +227,6 @@ func (e *env) getCandidateOperators() {
 
 func (e *env) Run(opt *RunCommandOptions) error {
 	var component config.Component
-
 	operators := []config.Operator{}
 	logger := e.log
 
@@ -242,13 +241,21 @@ func (e *env) Run(opt *RunCommandOptions) error {
 		}
 	}
 
+	// setup envs to be added to the operator
+	envs := []string{}
+
 	if opt.Component != "" {
+		found := false
 		for _, c := range environmentDescriptor.Components {
 			if c.Name == opt.Component {
 				component = c
+				found = true
 			}
 		}
-		if &component != nil {
+		if found {
+
+			logger.Debugf("Setting MERLIN_COMPONENT=%s", component.Name)
+			envs = append(envs, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))
 			componentDescriptor, err := e.prepareComponentDescriptor(opt.Override, &component)
 			if err != nil {
 				return err
@@ -266,24 +273,16 @@ func (e *env) Run(opt *RunCommandOptions) error {
 	}
 
 	for _, o := range operators {
-
-		logger.WithFields(map[string]interface{}{
-			"Operator": o.Name,
-		}).Debug("Running operator")
-
+		var operatorEnv []string
 		if o.Description != "" {
 			logger.Infof("Running: %s", o.Description)
 		}
-		envs := o.Spec.Env
-		if &component != nil {
-			logger.Infof("Setting MERLIN_COMPONENT=%s", component.Name)
-			envs = append(envs, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))
-		}
 
+		operatorEnv = append(envs, o.Spec.Env...)
 		if opt.SkipExec {
 			logger.Debugf("Skipping execution, actual command:\n%v", append([]string{o.Spec.Program}, o.Spec.Args...))
 		} else {
-			err = commander.New(o.Spec.Program, o.Spec.Args, envs).Run()
+			err = commander.New(o.Spec.Program, o.Spec.Args, operatorEnv).Run()
 			if err != nil {
 				return err
 			}
