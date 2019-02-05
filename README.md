@@ -34,18 +34,30 @@ Use "merlin [command] --help" for more information about a command.
 
  ## Example
 
-Show all commands that an environment provide
+Show all commands that an environment provids
 ```
 merlin list
 ```
 
- Debug cfapi
- * Connect to cfapi
+ Debug cfapi 
  ```
   merlin run connect --component cfapi
  ```
 
- * Start cfapi service locally
+ Start cfapi service locally
  ```
-  merlin run start --component cfapi
+  merlin run start
  ```
+
+ # Merlin definitions
+ * `merlin.yaml` - The configuration file that is been created using `merlin init` command. This file represents one environment. The file contains information about how to talk to codefresh, how to talk to kubernetes cluster whern the environment is set etc.
+ * Environment - A set of components and components
+ * Component - Logical part of the environment, has a set of operators.
+ * Operator - Unit that describe how to interact with an Environment or a Component. Each operator has a name, in general there is no uniqness of a name across the Environment and nasted Components
+
+ ## Multiple operator execution flow
+Running a `merlin run [NAME]` command will search the all operators named: NAME on the environment level and exeuted all of them sequentially (`merlin list` can help you to understand which operators has multiple executions).
+A few notes to have in mind:
+* If a flag `--component COMPONENT` set, operators from environment level and compoent level will be executed, where the environment level are in priority.
+* Next operator executed only when the previous one finished successfully
+* Operators executions flow are sharing environment variables exist on the host process (that runs the `merlin run` command)

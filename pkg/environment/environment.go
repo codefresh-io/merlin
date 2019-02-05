@@ -14,7 +14,7 @@ import (
 	"github.com/codefresh-io/merlin/pkg/cache"
 	"github.com/codefresh-io/merlin/pkg/commander"
 	"github.com/codefresh-io/merlin/pkg/config"
-	// "github.com/codefresh-io/merlin/pkg/strvals"
+	"github.com/codefresh-io/merlin/pkg/strvals"
 )
 
 type (
@@ -101,7 +101,7 @@ func (e *env) readEnvironmentTemplate() ([]byte, error) {
 	}
 }
 
-func (e *env) readValueFiles(values []config.Values) (map[string]interface{}, error) {
+func (e *env) readValueFiles(values []config.Values, override []string) (map[string]interface{}, error) {
 	base := map[string]interface{}{}
 	for _, v := range values {
 		curr := map[string]interface{}{}
@@ -142,10 +142,18 @@ func (e *env) readValueFiles(values []config.Values) (map[string]interface{}, er
 			base = mergeValues(base, curr)
 		}
 	}
+
+	for _, value := range override {
+		e.log.Debugf("Recieved overwrite value: %s", value)
+		if err := strvals.ParseInto(value, base); err != nil {
+			return nil, fmt.Errorf("failed parsing --set data: %s", err)
+		}
+	}
+
 	return base, nil
 }
 
-func (e *env) prepareEnvironmemtDescriptor() (*config.EnvironmentDescriptor, error) {
+func (e *env) prepareEnvironmemtDescriptor(override []string) (*config.EnvironmentDescriptor, error) {
 	source := make(map[string]interface{})
 	environmentDescriptor := &config.EnvironmentDescriptor{}
 	environmentContent, err := e.readEnvironmentTemplate()
@@ -159,12 +167,11 @@ func (e *env) prepareEnvironmemtDescriptor() (*config.EnvironmentDescriptor, err
 	}
 	source["Merlin"] = systemSet
 
-	values, err := e.readValueFiles(e.config.Environment.Values)
+	values, err := e.readValueFiles(e.config.Environment.Values, override)
 	if err != nil {
 		return nil, err
 	}
-	baseSet := make(map[string]interface{})
-	source["Values"] = mergeValues(values, baseSet)
+	source["Values"] = values
 
 	err = template.Render(environmentContent, source, environmentDescriptor)
 	return environmentDescriptor, err
@@ -179,7 +186,7 @@ func (e *env) getSystemVariables() (map[string]interface{}, error) {
 	return mergeValues(system, json), nil
 }
 
-func (e *env) prepareComponentDescriptor(component *config.Component) (*config.ComponentDescriptor, error) {
+func (e *env) prepareComponentDescriptor(override []string, component *config.Component) (*config.ComponentDescriptor, error) {
 	source := make(map[string]interface{})
 	componentDescriptor := &config.ComponentDescriptor{}
 
@@ -194,12 +201,11 @@ func (e *env) prepareComponentDescriptor(component *config.Component) (*config.C
 	}
 	source["Merlin"] = systemSet
 
-	values, err := e.readValueFiles(component.Values)
+	values, err := e.readValueFiles(component.Values, override)
 	if err != nil {
 		return nil, err
 	}
-	baseSet := make(map[string]interface{})
-	source["Values"] = mergeValues(values, baseSet)
+	source["Values"] = values
 
 	componentValues := make(map[string]interface{})
 	componentStruct, err := convertStruct(component)
@@ -225,13 +231,13 @@ func (e *env) Run(opt *RunCommandOptions) error {
 	operators := []config.Operator{}
 	logger := e.log
 
-	environmentDescriptor, err := e.prepareEnvironmemtDescriptor()
+	environmentDescriptor, err := e.prepareEnvironmemtDescriptor(opt.Override)
 	if err != nil {
 		return err
 	}
 	for _, o := range environmentDescriptor.Operators {
 		if o.Name == opt.Operator {
-			logger.Debugf("Adding operator %s to operator slice for environment descriptor", o.Name)
+			logger.Debugf("Adding operator %s to operator slice", o.Name)
 			operators = append(operators, o)
 		}
 	}
@@ -243,28 +249,20 @@ func (e *env) Run(opt *RunCommandOptions) error {
 			}
 		}
 		if &component != nil {
-			componentDescriptor, err := e.prepareComponentDescriptor(&component)
+			componentDescriptor, err := e.prepareComponentDescriptor(opt.Override, &component)
 			if err != nil {
 				return err
 			}
 			for _, op := range componentDescriptor.Operators {
 
 				if opt.Operator == op.Name {
-					logger.Debugf("Adding operator %s to operator slice for component %s descriptor", op.Name, opt.Component)
+					logger.Debugf("Adding operator %s to operator slice", op.Name)
 					operators = append(operators, op)
 				}
 			}
 		} else {
 			return fmt.Errorf("Component %s not found", opt.Component)
 		}
-
-		// for _, value := range opt.Override {
-		// 	logger.Debugf("Recieved overwrite value: %s", value)
-		// 	if err := strvals.ParseInto(value, setValues); err != nil {
-		// 		return fmt.Errorf("failed parsing --set data: %s", err)
-		// 	}
-		// }
-
 	}
 
 	for _, o := range operators {
@@ -296,23 +294,23 @@ func (e *env) Run(opt *RunCommandOptions) error {
 
 func (e *env) List(_ *ListCommandOptions) ([][]string, error) {
 	res := [][]string{}
-	environmentDescriptor, err := e.prepareEnvironmemtDescriptor()
+	environmentDescriptor, err := e.prepareEnvironmemtDescriptor(nil)
 	if err != nil {
 		return nil, err
 	}
 	for _, op := range environmentDescriptor.Operators {
-		row := []string{"Command", "Envronment", op.Name, op.Description}
+		row := []string{"Envronment", op.Name, op.Description}
 		res = append(res, row)
 	}
 
 	for _, c := range environmentDescriptor.Components {
 		e.log.Debugf("Getting info about component %s", c.Name)
-		componentDescriptor, err := e.prepareComponentDescriptor(&c)
+		componentDescriptor, err := e.prepareComponentDescriptor(nil, &c)
 		if err != nil {
 			return nil, err
 		}
 		for _, op := range componentDescriptor.Operators {
-			row := []string{"Command", fmt.Sprintf("Component: [%s]", c.Name), op.Name, op.Description}
+			row := []string{fmt.Sprintf("Component: [%s]", c.Name), op.Name, op.Description}
 			res = append(res, row)
 		}
 	}

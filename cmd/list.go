@@ -26,6 +26,11 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Show a list of all commands exposed",
+	Long: `Show list will sumarize all the operators available for giving merlinconfig file.
+The talbe has 3 columns, Level, Name and Description
+Level: can be of of: Environment of Component (with name) giving the information on which level the operator configured.string
+Name: Name of the operator which can be invoked using "Merlin run [NAME]" command
+Description: descriptions of one or more operators (grouped by the name) taken from the operator.description field`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
@@ -39,7 +44,7 @@ var listCmd = &cobra.Command{
 		res, err := environment.Build(c, store, log).List(nil)
 		dieIfError(err)
 		t := table.New(&table.Options{
-			Headers: []string{"Type", "Level", "Name", "Description"},
+			Headers: []string{"Level", "Name", "Description"},
 		})
 		t.Table().AppendBulk(res)
 		t.Table().Render()
