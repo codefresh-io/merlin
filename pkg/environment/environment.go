@@ -12,17 +12,15 @@ import (
 	"github.com/codefresh-io/merlin/pkg/template"
 
 	"github.com/codefresh-io/merlin/pkg/cache"
-	"github.com/codefresh-io/merlin/pkg/codefresh"
 	"github.com/codefresh-io/merlin/pkg/commander"
 	"github.com/codefresh-io/merlin/pkg/config"
-	"github.com/codefresh-io/merlin/pkg/kube"
 	"github.com/codefresh-io/merlin/pkg/strvals"
 )
 
 type (
 	Environment interface {
-		Create(*CreateOptions) error
 		Run(*RunCommandOptions) error
+		List(*ListCommandOptions) ([][]string, error)
 	}
 
 	env struct {
@@ -34,75 +32,18 @@ type (
 	RunCommandOptions struct {
 		Component string
 		Override  []string
-		Command   string
+		Operator  string
 		SkipExec  bool
 	}
 
-	CreateOptions struct {
-		Name string
-	}
+	ListCommandOptions struct{}
 )
 
 func Build(c *config.Config, cache cache.Cache, log *logrus.Entry) Environment {
 	return &env{c, log, cache}
 }
 
-func (e *env) Create(opt *CreateOptions) error {
-	logger := e.log
-	k, err := kube.New(e.config, logger)
-	err = k.EnsureNamespaceNotExist(opt.Name)
-	if err != nil {
-		return err
-	}
-	logger.Debug("Namespace does not exist!")
-	return codefresh.CreateEnvironment(&codefresh.Options{
-		Name:   opt.Name,
-		Config: e.config,
-	}, logger)
-}
-
-func (e *env) readEnvironmentDescriptor() (*config.EnvironmentDescriptor, error) {
-	desc := config.EnvironmentDescriptor{}
-	if e.config.Environment.Path != "" {
-		e.log.Debugf("Reading environment descriptor from: %s", e.config.Environment.Path)
-		desc, err := config.ReadEnvironmentDescriptor(e.config.Environment.Path)
-		if err != nil {
-			return nil, err
-		}
-		e.log.Debug("Saving to cache")
-		e.cache.Put("environment.path", desc)
-		return desc, nil
-
-	} else {
-		e.log.WithFields(map[string]interface{}{
-			"Owner":    e.config.Environment.Git.Owner,
-			"Repo":     e.config.Environment.Git.Repo,
-			"Revision": e.config.Environment.Git.Revision,
-		}).Debugf("Reading environment descriptor git , path: %s", e.config.Environment.Git.Path)
-
-		git := e.config.Environment.Git
-		key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
-		if err := e.cache.Get(key, &desc); err != nil {
-			g := github.New(e.config.Github.Token, e.log)
-			content, err := g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
-			if err != nil {
-				return nil, err
-			}
-			descriptor := &config.EnvironmentDescriptor{}
-			err = yaml.Unmarshal(content, descriptor)
-			if err != nil {
-				return nil, err
-			}
-			e.log.Debug("Saving environment to cache")
-			e.cache.Put(key, &descriptor)
-			return descriptor, nil
-		}
-		e.log.Debug("Environment loaded from cache")
-		return &desc, nil
-	}
-}
-
-func (e *env) readComponentTemplate(component *config.ComponentDescriptor) ([]byte, error) {
+func (e *env) readComponentTemplate(component *config.Component) ([]byte, error) {
 	content := []byte{}
 	if component.Spec.Path != "" {
 		e.log.Debugf("Reading component template file from: %s", component.Spec.Path)
@@ -131,9 +72,38 @@ func (e *env) readComponentTemplate(component *config.ComponentDescriptor) ([]by
 	}
 }
 
-func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]interface{}, error) {
+func (e *env) readEnvironmentTemplate() ([]byte, error) {
+	content := []byte{}
+	pathToLocalEnvironment := e.config.Environment.Spec.Path
+	if pathToLocalEnvironment != "" {
+		e.log.Debugf("Reading environment template file from: %s", pathToLocalEnvironment)
+		return ioutil.ReadFile(pathToLocalEnvironment)
+	} else {
+		git := e.config.Environment.Spec.Git
+		key := fmt.Sprintf("%s.%s.%s.%s", git.Owner, git.Repo, git.Path, git.Revision)
+		e.log.WithFields(map[string]interface{}{
+			"Owner":    git.Owner,
+			"Repo":     git.Repo,
+			"Revision": git.Revision,
+		}).Debugf("Reading environment template from git : %s", git.Path)
+		if err := e.cache.Get(key, &content); err != nil {
+			g := github.New(e.config.Github.Token, e.log)
+			content, err = g.ReadFile(git.Owner, git.Repo, git.Path, git.Revision)
+			if err != nil {
+				return nil, err
+			}
+			e.log.Debug("Saving environment template to cache")
+			e.cache.Put(key, &content)
+			return content, nil
+		}
+		e.log.Debug("Environment template loaded from cache")
+		return content, nil
+	}
+}
+
+func (e *env) readValueFiles(values []config.Values, override []string) (map[string]interface{}, error) {
 	base := map[string]interface{}{}
-	for _, v := range component.Values {
+	for _, v := range values {
 		curr := map[string]interface{}{}
 		if v.Path != "" {
 			e.log.Debugf("Reading value files from: %s", v.Path)
@@ -172,99 +142,179 @@ func (e *env) readValueFiles(component *config.ComponentDescriptor) (map[string]
 			base = mergeValues(base, curr)
 		}
 	}
+
+	for _, value := range override {
+		e.log.Debugf("Recieved overwrite value: %s", value)
+		if err := strvals.ParseInto(value, base); err != nil {
+			return nil, fmt.Errorf("failed parsing --set data: %s", err)
+		}
+	}
+
 	return base, nil
 }
 
-func (e *env) Run(opt *RunCommandOptions) error {
-	logger := e.log
-	var component config.ComponentDescriptor
-	rs := &config.RenderedService{}
-
-	environmentPath := e.config.Environment.Path
-	environmentDescriptor, err := e.readEnvironmentDescriptor()
+func (e *env) prepareEnvironmemtDescriptor(override []string) (*config.EnvironmentDescriptor, error) {
+	source := make(map[string]interface{})
+	environmentDescriptor := &config.EnvironmentDescriptor{}
+	environmentContent, err := e.readEnvironmentTemplate()
 	if err != nil {
-		return err
-	}
-	for _, c := range environmentDescriptor.Components {
-		if c.Name == opt.Component {
-			component = c
-		}
-	}
-	if &component == nil {
-		return fmt.Errorf("Service: %s not found in Codefresh system config %s", opt.Component, environmentPath)
+		return nil, err
 	}
 
-	content, err := e.readComponentTemplate(&component)
+	systemSet, err := e.getSystemVariables()
 	if err != nil {
-		return err
+		return nil, err
 	}
+	source["Merlin"] = systemSet
 
-	// TODO read all files
-	base, err := e.readValueFiles(&component)
+	values, err := e.readValueFiles(e.config.Environment.Values, override)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	source["Values"] = values
 
-	setValues := map[string]interface{}{}
-	dataSource := make(map[string]interface{})
+	err = template.Render(environmentContent, source, environmentDescriptor)
+	return environmentDescriptor, err
+}
 
-	for _, value := range opt.Override {
-		logger.Debugf("Recieved overwrite value: %s", value)
-		if err := strvals.ParseInto(value, setValues); err != nil {
-			return fmt.Errorf("failed parsing --set data: %s", err)
-		}
-	}
-	base = mergeValues(base, setValues)
-	dataSource["Values"] = base
-
+func (e *env) getSystemVariables() (map[string]interface{}, error) {
 	system := make(map[string]interface{})
-	jc, err := convertStruct(e.config)
+	json, err := convertStruct(e.config)
+	if err != nil {
+		return nil, err
+	}
+	return mergeValues(system, json), nil
+}
+
+func (e *env) prepareComponentDescriptor(override []string, component *config.Component) (*config.ComponentDescriptor, error) {
+	source := make(map[string]interface{})
+	componentDescriptor := &config.ComponentDescriptor{}
+
+	componentContent, err := e.readComponentTemplate(component)
+	if err != nil {
+		return nil, err
+	}
+
+	systemSet, err := e.getSystemVariables()
+	if err != nil {
+		return nil, err
+	}
+	source["Merlin"] = systemSet
+
+	values, err := e.readValueFiles(component.Values, override)
+	if err != nil {
+		return nil, err
+	}
+	source["Values"] = values
+
+	componentValues := make(map[string]interface{})
+	componentStruct, err := convertStruct(component)
+	if err != nil {
+		return nil, err
+	}
+	source["Component"] = mergeValues(componentValues, componentStruct)
+
+	err = template.Render(componentContent, source, componentDescriptor)
+	if err != nil {
+		return nil, err
+	}
+	return componentDescriptor, err
+}
+
+func (e *env) getCandidateOperators() {
+
+}
+
+func (e *env) Run(opt *RunCommandOptions) error {
+	var component config.Component
+
+	operators := []config.Operator{}
+	logger := e.log
+
+	environmentDescriptor, err := e.prepareEnvironmemtDescriptor(opt.Override)
 	if err != nil {
 		return err
 	}
-	system = mergeValues(system, jc)
-
-	js, err := convertStruct(component)
-	if err != nil {
-		return err
-	}
-	system = mergeValues(system, js)
-
-	dataSource["Merlin"] = system
-
-	err = template.Render(content, dataSource, rs)
-	if err != nil {
-		return err
+	for _, o := range environmentDescriptor.Operators {
+		if o.Name == opt.Operator {
+			logger.Debugf("Adding operator %s to operator slice", o.Name)
+			operators = append(operators, o)
+		}
 	}
 
-	var cmd config.Command
-	for _, command := range rs.Commands {
+	if opt.Component != "" {
+		for _, c := range environmentDescriptor.Components {
+			if c.Name == opt.Component {
+				component = c
+			}
+		}
+		if &component != nil {
+			componentDescriptor, err := e.prepareComponentDescriptor(opt.Override, &component)
+			if err != nil {
+				return err
+			}
+			for _, op := range componentDescriptor.Operators {
 
-		if opt.Command == command.Name {
-			logger.WithFields(map[string]interface{}{
-				"Command": command.Name,
-			}).Debug("Found command")
-			cmd = command
+				if opt.Operator == op.Name {
+					logger.Debugf("Adding operator %s to operator slice", op.Name)
+					operators = append(operators, op)
+				}
+			}
+		} else {
+			return fmt.Errorf("Component %s not found", opt.Component)
+		}
+	}
+
+	for _, o := range operators {
+
+		logger.WithFields(map[string]interface{}{
+			"Operator": o.Name,
+		}).Debug("Running operator")
+
+		if o.Description != "" {
+			logger.Infof("Running: %s", o.Description)
+		}
+		envs := o.Spec.Env
+		if &component != nil {
+			logger.Infof("Setting MERLIN_COMPONENT=%s", component.Name)
+			envs = append(envs, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))
 		}
 
-	}
-	if &cmd != nil {
-		logger.WithFields(map[string]interface{}{
-			"Command": cmd.Name,
-		}).Debug("Running step")
-		logger.WithFields(map[string]interface{}{
-			"Command": cmd.Name,
-		}).Debugf("%s %v", cmd.Program, cmd.Args)
 		if opt.SkipExec {
-			logger.Debugf("Skipping execution, actual command:\n%v", append([]string{cmd.Program}, cmd.Args...))
+			logger.Debugf("Skipping execution, actual command:\n%v", append([]string{o.Spec.Program}, o.Spec.Args...))
 		} else {
-			err = commander.New(cmd.Program, cmd.Args, append(cmd.Env, fmt.Sprintf("MERLIN_COMPONENT=%s", component.Name))).Run()
+			err = commander.New(o.Spec.Program, o.Spec.Args, envs).Run()
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return err
+}
+
+func (e *env) List(_ *ListCommandOptions) ([][]string, error) {
+	res := [][]string{}
+	environmentDescriptor, err := e.prepareEnvironmemtDescriptor(nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, op := range environmentDescriptor.Operators {
+		row := []string{"Envronment", op.Name, op.Description}
+		res = append(res, row)
+	}
+
+	for _, c := range environmentDescriptor.Components {
+		e.log.Debugf("Getting info about component %s", c.Name)
+		componentDescriptor, err := e.prepareComponentDescriptor(nil, &c)
+		if err != nil {
+			return nil, err
+		}
+		for _, op := range componentDescriptor.Operators {
+			row := []string{fmt.Sprintf("Component: [%s]", c.Name), op.Name, op.Description}
+			res = append(res, row)
+		}
+	}
+	return res, nil
 }
 
 func convertStruct(obj interface{}) (map[string]interface{}, error) {

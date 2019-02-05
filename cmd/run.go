@@ -30,7 +30,6 @@ var (
 	set             []string
 	component       string
 	skipCommandExec bool
-	noCache         bool
 )
 
 var runCmd = &cobra.Command{
@@ -60,7 +59,7 @@ var runCmd = &cobra.Command{
 		err := environment.Build(c, store, log).Run(&environment.RunCommandOptions{
 			Component: component,
 			Override:  set,
-			Command:   args[0],
+			Operator:  args[0],
 			SkipExec:  skipCommandExec,
 		})
 		dieIfError(err)
@@ -74,5 +73,4 @@ func init() {
 	runCmd.Flags().StringArrayVar(&set, "set", nil, "Set value to override")
 	runCmd.Flags().StringVar(&component, "component", viper.GetString("component"), "Set name of the component where the command exist [$MERLIN_COMPONENT]")
 	runCmd.Flags().BoolVar(&skipCommandExec, "skip-exec", false, "set to get the final command as string, without executing it")
-	runCmd.Flags().BoolVar(&noCache, "no-cache", false, "dont use cache")
 }

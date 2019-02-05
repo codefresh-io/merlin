@@ -23,11 +23,14 @@ import (
 
 // variables been set with ldflags flag
 var (
-	version      = "dev"
-	commit       = "none"
-	date         = "unknown"
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+
+	// flags
 	verbose      bool
 	merlinconfig string
+	noCache      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -44,5 +47,6 @@ func init() {
 	viper.AutomaticEnv()
 	rootCmd.PersistentFlags().StringVar(&merlinconfig, "merlinconfig", "", "overwrite merlin default config path")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "get extra logs")
+	rootCmd.PersistentFlags().BoolVar(&noCache, "no-cache", false, "dont use cache")
 
 }

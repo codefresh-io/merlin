@@ -52,11 +52,11 @@ var configCmd = &cobra.Command{
 		}
 		err := createConfigFile(c, merlinconfig)
 		dieIfError(err)
-		if c.Environment.Path != "" {
-			_, err = config.ReadEnvironmentDescriptor(c.Environment.Path)
+		if c.Environment.Spec.Path != "" {
+			_, err = config.ReadEnvironmentDescriptor(c.Environment.Spec.Path)
 			dieIfError(err)
 		} else {
-			g := c.Environment.Git
+			g := c.Environment.Spec.Git
 			git := github.New(c.Github.Token, log)
 			dieIfError(err)
 			_, err = git.ReadFile(g.Owner, g.Repo, g.Path, g.Revision)
@@ -77,7 +77,7 @@ func init() {
 	configCmd.Flags().StringVar(&c.Kube.Context, "kube-config-context", "", "Set name the in kubeconfig to use (required)")
 	configCmd.Flags().StringVar(&c.Kube.Path, "kube-config-path", viper.GetString("kubeconfig"), "Set path to kubeconfig [$KUBECONFIG] (default: $HOME/.kube/config)")
 	configCmd.Flags().StringVar(&c.Github.Token, "github-token", viper.GetString("github"), "Set token to github [$GITHUB_TOKEN]")
-	configCmd.Flags().StringVar(&c.Environment.Path, "environment-descriptor", "", "Set path to environment descriptor (default is from github)")
+	configCmd.Flags().StringVar(&c.Environment.Spec.Path, "environment-descriptor", "", "Set path to environment descriptor (default is from github)")
 
 	rootCmd.MarkFlagRequired("codefresh-config-context")
 	rootCmd.MarkFlagRequired("codefresh-config-path")

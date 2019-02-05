@@ -18,13 +18,8 @@ type (
 			Path    string `yaml:"path"`
 		} `yaml:"codefresh"`
 		Environment struct {
-			Path string `yaml:"path"`
-			Git  struct {
-				Owner    string `yaml:"owner"`
-				Repo     string `yaml:"repo"`
-				Path     string `yaml:"path"`
-				Revision string `yaml:"revision"`
-			} `yaml:"git"`
+			Spec   Spec     `yaml:"spec"`
+			Values []Values `yaml:"values"`
 		} `yaml:"environment"`
 		Kube struct {
 			Context   string `yaml:"context"`
@@ -41,11 +36,12 @@ type (
 	}
 
 	EnvironmentDescriptor struct {
-		Version    string                `yaml:"version"`
-		Components []ComponentDescriptor `yaml:"components"`
+		Version    string      `yaml:"version"`
+		Components []Component `yaml:"components"`
+		Operators  []Operator  `yaml:"operators"`
 	}
 
-	ComponentDescriptor struct {
+	Component struct {
 		Name   string   `yaml:"name"`
 		Spec   Spec     `yaml:"spec"`
 		Values []Values `yaml:values`
@@ -53,33 +49,38 @@ type (
 
 	Spec struct {
 		Path string `yaml:"path"`
-		Git  struct {
-			Owner    string `yaml:"owner"`
-			Repo     string `yaml:"repo"`
-			Path     string `yaml:"path"`
-			Revision string `yaml:"revision"`
-		} `yaml:"git"`
+		Git  Git    `yaml:"git"`
 	}
 
 	Values struct {
 		Path string `yaml:"path"`
-		Git  struct {
-			Owner    string `yaml:"owner"`
-			Repo     string `yaml:"repo"`
-			Path     string `yaml:"path"`
-			Revision string `yaml:"revision"`
-		} `yaml:"git"`
+		Git  Git    `yaml:"git"`
 	}
 
-	RenderedService struct {
-		Commands []Command `yaml:"commands"`
+	Git struct {
+		Owner    string `yaml:"owner"`
+		Repo     string `yaml:"repo"`
+		Path     string `yaml:"path"`
+		Revision string `yaml:"revision"`
 	}
 
-	Command struct {
-		Name    string   `yaml:"name"`
-		Env     []string `yaml:"env"`
-		Program string   `yaml:"program"`
-		Args    []string `yaml:"args"`
+	ComponentDescriptor struct {
+		Operators []Operator `yaml:"operators"`
+	}
+
+	Operator struct {
+		Name        string `yaml:"name"`
+		Type        string `yaml:"type"`
+		Description string `yaml:"description"`
+		Spec        struct {
+			Pipeline  string   `yaml:"pipeline"`
+			Branch    string   `yaml:"branch"`
+			Variables []string `yaml:"variables"`
+
+			Env     []string `yaml:"env"`
+			Program string   `yaml:"program"`
+			Args    []string `yaml:"args"`
+		} `yaml:"spec"`
 	}
 )
 
