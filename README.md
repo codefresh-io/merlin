@@ -39,16 +39,6 @@ Show all commands that an environment provides
 merlin list
 ```
 
- Debug cfapi 
- ```
-  merlin run connect --component cfapi
- ```
-
- Start cfapi service locally
- ```
-  merlin run start
- ```
-
  # Merlin definitions
  * `merlin.yaml` - The configuration file that is been created using `merlin init` command. This file represents one environment. The file contains information about how to talk to codefresh, how to talk to kubernetes cluster where the environment is set etc.
  * Environment - A set of components and components
