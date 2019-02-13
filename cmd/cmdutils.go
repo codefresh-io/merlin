@@ -5,11 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/codefresh-io/merlin/pkg/cache"
 	"github.com/codefresh-io/merlin/pkg/config"
+	signalHandler "github.com/codefresh-io/merlin/pkg/signal"
 	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -99,4 +101,8 @@ func createCacheStore(c *config.Config, noCache bool, log *logrus.Entry) cache.C
 		Logger:  log,
 		NoCache: noCache,
 	})
+}
+
+func createSignalHandler(logger *logrus.Entry) signalHandler.Handler {
+	return signalHandler.NewSignalhandler([]syscall.Signal{syscall.SIGTERM, syscall.SIGINT}, logger)
 }

@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/codefresh-io/merlin/pkg/github"
 
@@ -29,11 +30,17 @@ type (
 		cache  cache.Cache
 	}
 
+	signalHandler interface {
+		Process()
+		Push(chan os.Signal)
+	}
+
 	RunCommandOptions struct {
-		Component string
-		Override  []string
-		Operator  string
-		SkipExec  bool
+		Component     string
+		Override      []string
+		Operator      string
+		SkipExec      bool
+		SignalHandler signalHandler
 	}
 
 	ListCommandOptions struct{}
@@ -282,7 +289,14 @@ func (e *env) Run(opt *RunCommandOptions) error {
 		if opt.SkipExec {
 			logger.Debugf("Skipping execution, actual command:\n%v", append([]string{o.Spec.Program}, o.Spec.Args...))
 		} else {
-			err = commander.New(o.Spec.Program, o.Spec.Args, operatorEnv).Run()
+			err = commander.New(&commander.Options{
+				Program:       o.Spec.Program,
+				Args:          o.Spec.Args,
+				Env:           operatorEnv,
+				SignalHandler: opt.SignalHandler,
+				Detached:      o.Spec.Detached,
+				Logger:        logger,
+			}).Run()
 			if err != nil {
 				return err
 			}

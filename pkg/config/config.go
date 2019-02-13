@@ -80,6 +80,9 @@ type (
 			Env     []string `yaml:"env"`
 			Program string   `yaml:"program"`
 			Args    []string `yaml:"args"`
+
+			Privileged bool `yaml:"privileged"`
+			Detached   bool `yaml:"detached"`
 		} `yaml:"spec"`
 	}
 )
