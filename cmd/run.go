@@ -18,6 +18,7 @@ limitations under the License.
 
 import (
 	"errors"
+	"os"
 
 	"github.com/codefresh-io/merlin/pkg/environment"
 	"github.com/codefresh-io/merlin/pkg/logger"
@@ -55,12 +56,23 @@ var runCmd = &cobra.Command{
 		})
 		c := readConfigFromPathOrDie(log)
 		store := createCacheStore(c, noCache, log)
+		signalHandler := createSignalHandler(log)
+
+		var gracefulStop = make(chan os.Signal)
+		signalHandler.Push(gracefulStop)
+		go func() {
+			log.Debug("Wating to get signal to persis data to cache")
+			sig := <-gracefulStop
+			store.Persist()
+			gracefulStop <- sig
+		}()
 		defer store.Persist()
 		err := environment.Build(c, store, log).Run(&environment.RunCommandOptions{
-			Component: component,
-			Override:  set,
-			Operator:  args[0],
-			SkipExec:  skipCommandExec,
+			Component:     component,
+			Override:      set,
+			Operator:      args[0],
+			SkipExec:      skipCommandExec,
+			SignalHandler: signalHandler,
 		})
 		dieIfError(err)
 	},

@@ -80,6 +80,8 @@ type (
 			Env     []string `yaml:"env"`
 			Program string   `yaml:"program"`
 			Args    []string `yaml:"args"`
+
+			Detached bool `yaml:"detached"`
 		} `yaml:"spec"`
 	}
 )
