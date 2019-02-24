@@ -83,6 +83,7 @@ require (
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/keybase/go-crypto v0.0.0-20181127160227-255a5089e85a // indirect
+	github.com/manifoldco/promptui v0.3.2
 	github.com/mattbaird/elastigo v0.0.0-20170123220020-2fe47fd29e4b // indirect
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/michaelklishin/rabbit-hole v1.4.0 // indirect
