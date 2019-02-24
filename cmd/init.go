@@ -19,7 +19,6 @@ limitations under the License.
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/codefresh-io/merlin/pkg/config"
 	"github.com/codefresh-io/merlin/pkg/github"
@@ -44,8 +43,6 @@ var configCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		c.Name = args[0]
 		c.Kube.Namespace = args[0]
-		fmt.Println(args)
-		os.Exit(1)
 		log := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
 				"Command": "Create",
