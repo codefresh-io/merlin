@@ -18,10 +18,14 @@ limitations under the License.
 
 import (
 	"errors"
-	"fmt"
 
+	"fmt"
+	"os"
+
+	codefresh "github.com/codefresh-io/go-sdk/pkg/utils"
 	"github.com/codefresh-io/merlin/pkg/config"
 	"github.com/codefresh-io/merlin/pkg/github"
+	"github.com/codefresh-io/merlin/pkg/kube"
 	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -76,35 +80,42 @@ func runInteractiveShell(cmd *cobra.Command, args []string) error {
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Github.Token = result
 	}
 
 	if c.Codefresh.Path == "" {
 		prompt := promptui.Prompt{
-			Label: "Set full path to codefresh config",
+			Label:   "Set full path to codefresh config",
+			Default: fmt.Sprintf("%s/.cfconfig", os.Getenv("HOME")),
 		}
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Codefresh.Path = result
 	}
 
 	if c.Codefresh.Context == "" {
-		prompt := promptui.Prompt{
-			Label: "Set the name of to codefresh context",
-		}
-		result, err := prompt.Run()
-
+		cfconfig, err := codefresh.GetCFConfig(c.Codefresh.Path)
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
+		items := []string{}
+		for _, c := range cfconfig.Contexts {
+			items = append(items, c.Name)
+		}
+		prompt := promptui.Select{
+			Label: "Set the name of to codefresh context",
+			Items: items,
+		}
+		_, result, err := prompt.Run()
+		if err != nil {
+			return err
+		}
+
 		c.Codefresh.Context = result
 	}
 
@@ -115,8 +126,7 @@ func runInteractiveShell(cmd *cobra.Command, args []string) error {
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Environment.Spec.Git.Owner = result
 	}
@@ -127,8 +137,7 @@ func runInteractiveShell(cmd *cobra.Command, args []string) error {
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Environment.Spec.Git.Repo = result
 	}
@@ -139,33 +148,36 @@ func runInteractiveShell(cmd *cobra.Command, args []string) error {
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Environment.Spec.Git.Path = result
 	}
 
 	if c.Kube.Path == "" {
 		prompt := promptui.Prompt{
-			Label: "Set path to kubectl config",
+			Label:   "Set path to kubectl config",
+			Default: fmt.Sprintf("%s/.kube/config", os.Getenv("HOME")),
 		}
 		result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Kube.Path = result
 	}
 	if c.Kube.Context == "" {
-		prompt := promptui.Prompt{
-			Label: "Set the name of the context in kubeconfig",
+		items, err := kube.GetKubeContexts(c.Kube.Path)
+		if err != nil {
+			return err
 		}
-		result, err := prompt.Run()
+		prompt := promptui.Select{
+			Label: "Set the name of the context in kubeconfig",
+			Items: items,
+		}
+		_, result, err := prompt.Run()
 
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
-			return nil
+			return err
 		}
 		c.Kube.Context = result
 	}
