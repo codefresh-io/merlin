@@ -1,11 +1,8 @@
 package utils
 
 import (
-	"io/ioutil"
 	"net"
 	"strconv"
-
-	yaml "gopkg.in/yaml.v2"
 )
 
 func GetAvailablePort() (int, error) {
@@ -26,11 +23,3 @@ func GetAvailablePort() (int, error) {
 	return port, err
 }
 
-func ReadFileInto(path string, target interface{}) error {
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	err = yaml.Unmarshal(content, target)
-	return err
-}
