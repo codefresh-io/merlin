@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/codefresh-io/merlin/pkg/github"
 	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/spf13/cobra"
 )
@@ -36,16 +35,13 @@ var versionCmd = &cobra.Command{
 			},
 			Debug: verbose,
 		})
-		c := readConfigFromPathOrDie(log)
-		git := github.New(c.Github.Token, log)
 		v := map[string]interface{}{
-			"Version":        version,
-			"Commit":         commit,
-			"Date":           date,
-			"Latest_Version": git.GetLatestVersion(),
+			"Version": version,
+			"Commit":  commit,
+			"Date":    date,
 		}
 		b, err := json.Marshal(v)
-		dieIfError(err)
+		dieIfError(log, err)
 		fmt.Println(string(b))
 	},
 }

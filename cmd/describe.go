@@ -15,35 +15,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// variables been set with ldflags flag
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-
-	// flags
-	verbose      bool
-	merlinconfig string
-	noCache      bool
-)
-
-var rootCmd = &cobra.Command{
-	Use:   "merlin",
-	Short: "A command line application for a Codefresh developer",
+var describeCmdOpt struct {
+	environmentJs string
 }
 
-// Execute - execute the root command
-func Execute() {
-	rootCmd.Execute()
+var describeCmd = &cobra.Command{
+	Use:   "describe",
+	Short: "Show a list of all operators exposed",
 }
 
 func init() {
-	viper.AutomaticEnv()
-	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "get extra logs")
+	rootCmd.AddCommand(describeCmd)
 }

@@ -17,197 +17,144 @@ limitations under the License.
 */
 
 import (
-	"errors"
-
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	codefresh "github.com/codefresh-io/go-sdk/pkg/utils"
-	"github.com/codefresh-io/merlin/pkg/config"
-	"github.com/codefresh-io/merlin/pkg/github"
 	"github.com/codefresh-io/merlin/pkg/kube"
 	"github.com/codefresh-io/merlin/pkg/logger"
+	"github.com/codefresh-io/merlin/pkg/spec"
 	"github.com/manifoldco/promptui"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var c = &config.Config{}
+var initCmdOpt struct {
+	name          string
+	setList       []string
+	environmentJs string
+	codefresh     struct {
+		path    string
+		context string
+	}
+	kubernetes struct {
+		path    string
+		context string
+	}
+}
 
-var configCmd = &cobra.Command{
-	Use:     "init [name]",
-	Short:   "Create config file",
-	PreRunE: runInteractiveShell,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			dieIfError(errors.New("Name is required"))
-		}
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		c.Name = args[0]
-		c.Kube.Namespace = args[0]
-		log := logger.New(&logger.LoggerOptions{
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "init",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
-				"Command": "Create",
+				"Command": "Run",
 			},
 			Debug: verbose,
 		})
-		if merlinconfig == "" {
-			err := ensureLocalDirectory(c)
-			dieIfError(err)
-		}
-		err := createConfigFile(c, merlinconfig)
-		dieIfError(err)
-		if c.Environment.Spec.Path != "" {
-			_, err = config.ReadEnvironmentDescriptor(c.Environment.Spec.Path)
-			dieIfError(err)
+		logger.Debug("Running")
+
+		cnf := spec.MerlinConfig{}
+
+		if initCmdOpt.name == "" {
+			cnf.Name = getFromUserOrDie(logger, "Give your environment a name", nil)
 		} else {
-			g := c.Environment.Spec.Git
-			git := github.New(c.Github.Token, log)
-			dieIfError(err)
-			_, err = git.ReadFile(g.Owner, g.Repo, g.Path, g.Revision)
-			dieIfError(err)
+			cnf.Name = initCmdOpt.name
 		}
+		location := fmt.Sprintf("%s/.merlin/%s.json", os.Getenv("HOME"), cnf.Name)
+
+		if initCmdOpt.codefresh.path == "" {
+			path := getFromUserOrDie(logger, "Path to codefresh config", nil)
+			cnf.Codefresh.Path = resolvePathOrDie(logger, path)
+		} else {
+			cnf.Codefresh.Path = initCmdOpt.codefresh.path
+		}
+		if initCmdOpt.codefresh.context == "" {
+			cf, err := codefresh.GetCFConfig(cnf.Codefresh.Path)
+			dieIfError(logger, err)
+			items := []string{}
+			for _, c := range cf.Contexts {
+				items = append(items, c.Name)
+			}
+			name := getFromUserOrDie(logger, "Select codefresh context", items)
+			if name == "" {
+				name = cf.CurrentContext
+			}
+
+			cnf.Codefresh.Context = name
+		} else {
+			cnf.Codefresh.Context = initCmdOpt.codefresh.context
+		}
+
+		if initCmdOpt.kubernetes.path == "" {
+			path := getFromUserOrDie(logger, "Path to kubeconfig", nil)
+			cnf.Kubernetes.Path = resolvePathOrDie(logger, path)
+		} else {
+			cnf.Kubernetes.Path = initCmdOpt.kubernetes.path
+		}
+
+		if initCmdOpt.kubernetes.context == "" {
+			items, current, err := kube.GetKubeContexts(cnf.Kubernetes.Path)
+			dieIfError(logger, err)
+			name := getFromUserOrDie(logger, "Select kube context", items)
+			if name == "" {
+				name = current
+			}
+
+			cnf.Kubernetes.Context = name
+		} else {
+			cnf.Kubernetes.Context = initCmdOpt.kubernetes.context
+		}
+
+		if initCmdOpt.environmentJs == "" {
+			path := getFromUserOrDie(logger, "Path to environment.js file", nil)
+			cnf.EnvironmentJS = resolvePathOrDie(logger, path)
+		} else {
+			cnf.EnvironmentJS = initCmdOpt.environmentJs
+		}
+
+		res, err := json.Marshal(cnf)
+		dieIfError(logger, err)
+		err = ioutil.WriteFile(location, res, 0644)
+		return err
+
 	},
 }
 
-func runInteractiveShell(cmd *cobra.Command, args []string) error {
-	if c.Github.Token == "" {
-		prompt := promptui.Prompt{
-			Label: "Set token to github",
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Github.Token = result
-	}
-
-	if c.Codefresh.Path == "" {
-		prompt := promptui.Prompt{
-			Label:   "Set full path to codefresh config",
-			Default: fmt.Sprintf("%s/.cfconfig", os.Getenv("HOME")),
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Codefresh.Path = result
-	}
-
-	if c.Codefresh.Context == "" {
-		cfconfig, err := codefresh.GetCFConfig(c.Codefresh.Path)
-		if err != nil {
-			return err
-		}
-		items := []string{}
-		for _, c := range cfconfig.Contexts {
-			items = append(items, c.Name)
-		}
-		prompt := promptui.Select{
-			Label: "Set the name of to codefresh context",
+func getFromUserOrDie(logger *logrus.Entry, label string, items []string) string {
+	var res string
+	var err error
+	if items != nil && len(items) > 0 {
+		p := promptui.Select{
 			Items: items,
+			Label: label,
 		}
-		_, result, err := prompt.Run()
-		if err != nil {
-			return err
+		_, res, err = p.Run()
+	} else {
+		p := promptui.Prompt{
+			Label: label,
 		}
-
-		c.Codefresh.Context = result
+		res, err = p.Run()
 	}
-
-	if c.Environment.Spec.Git.Owner == "" {
-		prompt := promptui.Prompt{
-			Label: "Set the repository owner where environment descriptor can be found",
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Environment.Spec.Git.Owner = result
-	}
-	if c.Environment.Spec.Git.Repo == "" {
-		prompt := promptui.Prompt{
-			Label: "Set the repository name where environment descriptor can be found",
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Environment.Spec.Git.Repo = result
-	}
-	if c.Environment.Spec.Git.Path == "" {
-		prompt := promptui.Prompt{
-			Label: "Set the path where the environment descriptor can be found relative to the repository",
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Environment.Spec.Git.Path = result
-	}
-
-	if c.Kube.Path == "" {
-		prompt := promptui.Prompt{
-			Label:   "Set path to kubectl config",
-			Default: fmt.Sprintf("%s/.kube/config", os.Getenv("HOME")),
-		}
-		result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Kube.Path = result
-	}
-	if c.Kube.Context == "" {
-		items, err := kube.GetKubeContexts(c.Kube.Path)
-		if err != nil {
-			return err
-		}
-		prompt := promptui.Select{
-			Label: "Set the name of the context in kubeconfig",
-			Items: items,
-		}
-		_, result, err := prompt.Run()
-
-		if err != nil {
-			return err
-		}
-		c.Kube.Context = result
-	}
-	return nil
+	dieIfError(logger, err)
+	return res
 }
 
 func init() {
-	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(initCmd)
 
-	viper.BindEnv("kubeconfig", "KUBECONFIG")
-	viper.BindEnv("cfconfig", "CFCONFIG")
-	viper.BindEnv("github", "GITHUB_TOKEN")
+	initCmd.Flags().StringArrayVar(&initCmdOpt.setList, "set", []string{}, "--set name=value OR --set key.inner_key=value")
 
-	configCmd.Flags().StringVar(&c.Codefresh.Context, "codefresh-config-context", "", "Set name the context name in codefresh config to use (required)")
-	configCmd.Flags().StringVar(&c.Codefresh.Path, "codefresh-config-path", viper.GetString("cfconfig"), "Set path to codefresh config [$CFCONFIG]")
+	initCmd.Flags().StringVar(&initCmdOpt.name, "name", viper.GetString("MERLIN_ENVIRONMENT_NAME"), "Set environment name [$MERLIN_ENVIRONMENT_NAME]")
+	initCmd.Flags().StringVar(&initCmdOpt.environmentJs, "environment", viper.GetString("MERLIN_ENVIRONMENT_JS_PATH"), "Set path to environment.js file [$MERLIN_ENVIRONMENT_JS_PATH]")
 
-	configCmd.Flags().StringVar(&c.Kube.Context, "kube-config-context", "", "Set name the in kubeconfig to use (required)")
-	configCmd.Flags().StringVar(&c.Kube.Path, "kube-config-path", viper.GetString("kubeconfig"), "Set path to kubeconfig [$KUBECONFIG] (default: $HOME/.kube/config)")
+	initCmd.Flags().StringVar(&initCmdOpt.codefresh.path, "codefresh-config-path", viper.GetString("CODEFRESH_CONFIG"), "")
+	initCmd.Flags().StringVar(&initCmdOpt.codefresh.context, "codefresh-config-context", viper.GetString("CODEFRESH_CONTEXT"), "")
 
-	configCmd.Flags().StringVar(&c.Github.Token, "github-token", viper.GetString("github"), "Set token to github [$GITHUB_TOKEN]")
-
-	configCmd.Flags().StringVar(&c.Environment.Spec.Path, "environment-descriptor", "", "Set path to environment descriptor from local machine")
-	configCmd.Flags().StringVar(&c.Environment.Spec.Git.Owner, "environment-descriptor-repo-owner", "", "Set the repo owner of your environment descriptor")
-	configCmd.Flags().StringVar(&c.Environment.Spec.Git.Repo, "environment-descriptor-repo-name", "", "Set the repo name of your environment descriptor")
-	configCmd.Flags().StringVar(&c.Environment.Spec.Git.Path, "environment-descriptor-path", "", "Set the path to the your environment descriptor relative to the repositoty")
-	configCmd.Flags().StringVar(&c.Environment.Spec.Git.Revision, "environment-descriptor-revision", "master", "Set the revision of your environment descriptor relative to the repositoty (default is master)")
-
-	rootCmd.MarkFlagRequired("codefresh-config-context")
-	rootCmd.MarkFlagRequired("codefresh-config-path")
-	rootCmd.MarkFlagRequired("kube-config-context")
-	rootCmd.MarkFlagRequired("kube-config-path")
-	rootCmd.MarkFlagRequired("github-token")
+	initCmd.Flags().StringVar(&initCmdOpt.kubernetes.path, "kubernetes-config-path", viper.GetString("KUBECONFIG"), "")
+	initCmd.Flags().StringVar(&initCmdOpt.kubernetes.context, "kubernetes-config-context", viper.GetString("KUBE_CONTEXT"), "")
 }

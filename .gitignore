@@ -1,2 +1,4 @@
 .vscode
 .merlinlog
+.gitignore
+examples

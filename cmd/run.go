@@ -17,72 +17,223 @@ limitations under the License.
 */
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 
-	"github.com/codefresh-io/merlin/pkg/environment"
+	"github.com/codefresh-io/merlin/pkg/commander"
+	"github.com/codefresh-io/merlin/pkg/js"
 	"github.com/codefresh-io/merlin/pkg/logger"
-
+	"github.com/codefresh-io/merlin/pkg/spec"
+	"github.com/codefresh-io/merlin/pkg/strvals"
+	"github.com/imdario/mergo"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var (
-	set             []string
-	component       string
-	skipCommandExec bool
-)
+var runCmdOpt struct {
+	merlinconfigPath string
+	dryRun           bool
+	setList          []string
+	componentName    string
+	codefresh        struct {
+		path    string
+		context string
+	}
+	kubernetes struct {
+		path      string
+		context   string
+		namespace string
+	}
+	operator    *spec.Operator
+	component   *spec.Component
+	environemnt *spec.Environment
+	config      *spec.MerlinConfig
+}
 
-var runCmd = &cobra.Command{
-	Use:   "run [name]",
-	Short: "Run command",
-	Long:  "merlin run connect --component cfapi",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			dieIfError(errors.New("Run command from component template"))
-		}
-		if len(args) > 1 {
-			dieIfError(errors.New("Cant run multiple commands"))
-		}
-		return nil
-	},
+var testCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run a operator",
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.New(&logger.LoggerOptions{
+		logger := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
 				"Command": "Run",
-				"Target":  args[0],
 			},
 			Debug: verbose,
 		})
-		c := readConfigFromPathOrDie(log)
-		store := createCacheStore(c, noCache, log)
-		signalHandler := createSignalHandler(log)
+		logger.Debug("Running")
+		if runCmdOpt.merlinconfigPath != "" {
+			logger.Debugf("Reading merlinconfig file from %s", runCmdOpt.merlinconfigPath)
+			configFile, err := ioutil.ReadFile(resolvePathOrDie(logger, runCmdOpt.merlinconfigPath))
+			if !os.IsNotExist(err) {
+				runCmdOpt.config = &spec.MerlinConfig{}
+				err = json.Unmarshal(configFile, runCmdOpt.config)
+				if err != nil {
+					dieIfError(logger, err)
+				}
+			}
+		}
 
-		var gracefulStop = make(chan os.Signal)
-		signalHandler.Push(gracefulStop)
-		go func() {
-			log.Debug("Wating to get signal to persis data to cache")
-			sig := <-gracefulStop
-			store.Persist()
-			gracefulStop <- sig
-		}()
-		defer store.Persist()
-		err := environment.Build(c, store, log).Run(&environment.RunCommandOptions{
-			Component:     component,
-			Override:      set,
-			Operator:      args[0],
-			SkipExec:      skipCommandExec,
-			SignalHandler: signalHandler,
-		})
-		dieIfError(err)
+		logger.Debugf("Reading environment.js file from %s", runCmdOpt.config.EnvironmentJS)
+		f, err := ioutil.ReadFile(runCmdOpt.config.EnvironmentJS)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+		logger.Debugf("Creating new JS engine")
+		jsEngine := js.NewJSEngine()
+
+		_, err = jsEngine.Load([]string{string(f)}, nil)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+		logger.Debugf("Calling build function")
+		res, err := jsEngine.CallFn("build", nil)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+		logger.Debugf("Unmarshalling result")
+		runCmdOpt.environemnt = &spec.Environment{}
+		err = json.Unmarshal([]byte(res.String()), runCmdOpt.environemnt)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+
+		logger.Debugf("Looking for operator %s in environment.js", args[0])
+		for _, o := range runCmdOpt.environemnt.Operators {
+			if o.Name == args[0] {
+				op := o
+				runCmdOpt.operator = &op
+			}
+		}
+
+		if runCmdOpt.operator == nil {
+			dieIfError(logger, fmt.Errorf("Operator %s not found", args[0]))
+		}
+
+		params := map[string]interface{}{}
+		for _, p := range runCmdOpt.operator.Params {
+			var res = ""
+			logger.Debugf("Preparing parameter %s, description: %s", p.Name, p.Description)
+			if p.Required {
+				logger.Debugf("Parameter is required")
+			}
+
+			if p.Default != "" {
+				logger.Debugf("Default value foundf")
+				res = p.Default
+			}
+
+			if p.EnvironmentVariable != "" {
+				logger.Debugf("Checking environment variable to have %s", p.EnvironmentVariable)
+				r := os.Getenv(p.EnvironmentVariable)
+				if r != "" {
+					logger.Debugf("Found param in environment variables")
+					res = r
+				}
+			}
+
+			if p.InteractiveInput && res == "" {
+				label := ""
+				if p.Description != "" {
+					label = p.Description
+				} else {
+					label = p.Name
+				}
+				prompt := promptui.Prompt{
+					Label: label,
+				}
+				result, err := prompt.Run()
+				if err != nil {
+					dieIfError(logger, err)
+				}
+				res = result
+			}
+			if res == "" && p.Required {
+				dieIfError(logger, fmt.Errorf("Error: Parameter %s is required by operator %s and not been found", p.Name, runCmdOpt.operator.Name))
+			}
+			params[p.Name] = res
+		}
+
+		if runCmdOpt.componentName != "" {
+			logger.Debugf("Searching for component %s in environemnt.js", runCmdOpt.componentName)
+			for _, c := range runCmdOpt.environemnt.Components {
+				logger.Debugf("Matching component %s=%s", c.Name, runCmdOpt.componentName)
+				if c.Name == runCmdOpt.componentName {
+					logger.Debugf("Found component %s", c.Name)
+					com := c
+					runCmdOpt.component = &com
+				}
+			}
+			if runCmdOpt.component == nil {
+				dieIfError(logger, fmt.Errorf("Component %s was passed but not found", args[0]))
+			}
+		}
+		if runCmdOpt.operator.Scope == "component" && runCmdOpt.component == nil {
+			dieIfError(logger, fmt.Errorf("Operator \"%s\" is a scoped component, but no component was spesified, use --component", runCmdOpt.operator.Name))
+		}
+
+		logger.Debugf("Executing operator %s", runCmdOpt.operator.Name)
+		input := runCmdOpt.config.ToJSON()
+		err = mergo.Merge(&input, params, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+
+		override := map[string]interface{}{}
+		for _, value := range runCmdOpt.setList {
+			if err := strvals.ParseInto(value, override); err != nil {
+				dieIfError(logger, fmt.Errorf("failed parsing --set data: %s", err))
+			}
+		}
+		err = mergo.Merge(&input, override, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+
+		execArr, err := jsEngine.CallFn(fmt.Sprintf("$%s", runCmdOpt.operator.Name), input, runCmdOpt.component.ToJSON())
+		if err != nil {
+			dieIfError(logger, err)
+		}
+
+		set := spec.CmdSet{}
+		err = json.Unmarshal([]byte(execArr.String()), &set)
+		if err != nil {
+			dieIfError(logger, err)
+		}
+
+		for _, c := range set {
+			logger.Debugf("cmd: %v", c)
+			if !runCmdOpt.dryRun {
+				cmd := commander.New(&commander.Options{
+					Program:  c.Exec[0],
+					Args:     c.Exec[1:],
+					Env:      c.Env,
+					Detached: c.Detached,
+					Logger:   logger,
+					WorkDir:  resolvePathOrDie(logger, c.WorkDir),
+				})
+				err = cmd.Run()
+				if err != nil {
+					dieIfError(logger, err)
+				}
+			}
+		}
 	},
 }
 
 func init() {
-	viper.BindEnv("component", "MERLIN_COMPONENT")
+	rootCmd.AddCommand(testCmd)
+	testCmd.Flags().StringVar(&runCmdOpt.componentName, "component", viper.GetString("MERLIN_COMPONENT"), "Name of the component to be execute as part of the operator [$MERLIN_COMPONENT]")
+	testCmd.Flags().StringVar(&runCmdOpt.merlinconfigPath, "merlinconfig", viper.GetString("MERLIN_CONFIG"), "Path to relevant merlinconfig file (mostly in $HOME/.merlin/) [$MERLIN_CONFIG]")
+	testCmd.Flags().StringArrayVar(&runCmdOpt.setList, "set", []string{}, "--set name=value OR --set key.inner_key=value")
+	testCmd.Flags().BoolVar(&runCmdOpt.dryRun, "dry-run", false, "Dry run")
 
-	rootCmd.AddCommand(runCmd)
-	runCmd.Flags().StringArrayVar(&set, "set", nil, "Set value to override")
-	runCmd.Flags().StringVar(&component, "component", viper.GetString("component"), "Set name of the component where the command exist [$MERLIN_COMPONENT]")
-	runCmd.Flags().BoolVar(&skipCommandExec, "skip-exec", false, "set to get the final command as string, without executing it")
+	testCmd.Flags().StringVar(&runCmdOpt.codefresh.path, "codefresh-config-path", viper.GetString("CODEFRESH_CONFIG"), "")
+	testCmd.Flags().StringVar(&runCmdOpt.codefresh.context, "codefresh-config-context", viper.GetString("CODEFRESH_CONTEXT"), "")
+
+	testCmd.Flags().StringVar(&runCmdOpt.kubernetes.path, "kubernetes-config-path", viper.GetString("KUBECONFIG"), "")
+	testCmd.Flags().StringVar(&runCmdOpt.kubernetes.context, "kubernetes-config-context", viper.GetString("KUBE_CONTEXT"), "")
+	testCmd.Flags().StringVar(&runCmdOpt.kubernetes.namespace, "kubernetes-config-namespace", viper.GetString("KUBE_NAMESPACE"), "")
 }
