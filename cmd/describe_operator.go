@@ -40,6 +40,12 @@ var describeOperatorCmd = &cobra.Command{
 			},
 			Debug: verbose,
 		})
+		if len(args) > 1 {
+			dieIfError(logger, fmt.Errorf("Passed too many operators"))
+		}
+		if len(args) == 0 {
+			dieIfError(logger, fmt.Errorf("no operator passed"))
+		}
 		ac, err := getConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
 		dieIfError(logger, err)
 

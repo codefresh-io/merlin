@@ -82,10 +82,9 @@ var initCmd = &cobra.Command{
 		}
 
 		if initCmdOpt.codefresh.path == "" {
-			path := getFromUserOrDie(logger, "Path to codefresh config", nil)
-			initCmdOpt.codefresh.path = resolvePathOrDie(logger, path)
+			initCmdOpt.codefresh.path = getFromUserOrDie(logger, "Path to codefresh config", nil)
 		}
-		cf.Path = initCmdOpt.codefresh.path
+		cf.Path = resolvePathOrDie(logger, initCmdOpt.codefresh.path)
 
 		if initCmdOpt.codefresh.context == "" {
 			cf, err := codefresh.GetCFConfig(cf.Path)
@@ -104,10 +103,9 @@ var initCmd = &cobra.Command{
 		cf.Context = initCmdOpt.codefresh.context
 
 		if initCmdOpt.kubernetes.path == "" {
-			path := getFromUserOrDie(logger, "Path to kubeconfig", nil)
-			initCmdOpt.kubernetes.path = resolvePathOrDie(logger, path)
+			initCmdOpt.kubernetes.path = getFromUserOrDie(logger, "Path to kubeconfig", nil)
 		}
-		kubernetes.Path = initCmdOpt.kubernetes.path
+		kubernetes.Path = resolvePathOrDie(logger, initCmdOpt.kubernetes.path)
 
 		if initCmdOpt.kubernetes.context == "" {
 			items, current, err := kube.GetKubeContexts(kubernetes.Path)
@@ -121,10 +119,9 @@ var initCmd = &cobra.Command{
 		kubernetes.Context = initCmdOpt.kubernetes.context
 
 		if initCmdOpt.environmentJs == "" {
-			path := getFromUserOrDie(logger, "Path to environment.js file", nil)
-			initCmdOpt.environmentJs = resolvePathOrDie(logger, path)
+			initCmdOpt.environmentJs = getFromUserOrDie(logger, "Path to environment.js file", nil)
 		}
-		env.DescriptorLocation = initCmdOpt.environmentJs
+		env.DescriptorLocation = resolvePathOrDie(logger, initCmdOpt.environmentJs)
 
 		values := map[string]interface{}{}
 		for _, value := range initCmdOpt.setList {
