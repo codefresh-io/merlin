@@ -1,4 +1,5 @@
 declare let _ : any
+declare let GetAvailablePort: any
 
 class Environment {
     version: string;
@@ -73,7 +74,7 @@ class Command {
     description: string;
     workDir: string;
     exec: string[];
-    constructor(options : { name: string; description: string; workDir: string; exec: string[]; }) {
+    constructor(options : { name: string; description: string; workDir: string ; exec: string[]; }) {
         this.name = options.name;
         this.description = options.description;
         this.workDir = options.workDir;

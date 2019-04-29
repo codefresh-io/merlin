@@ -17,15 +17,16 @@ limitations under the License.
 */
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	codefresh "github.com/codefresh-io/go-sdk/pkg/utils"
 	"github.com/codefresh-io/merlin/pkg/kube"
 	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/codefresh-io/merlin/pkg/spec"
+	"github.com/codefresh-io/merlin/pkg/strvals"
+	"github.com/codefresh-io/merlin/pkg/utils"
+	"github.com/imdario/mergo"
 	"github.com/manifoldco/promptui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -49,32 +50,45 @@ var initCmdOpt struct {
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "init",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
+		location := fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
 		logger := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
-				"Command": "Run",
+				"Command":  "Run",
+				"Location": location,
 			},
 			Debug: verbose,
 		})
-		logger.Debug("Running")
+		logger.Debugf("Starting init process - %v", initCmdOpt)
+		cnf, err := utils.GetConfigFile(location)
+		dieIfError(logger, err)
 
-		cnf := spec.MerlinConfig{}
+		cf := spec.ConfigCodefresh{}
+		kubernetes := spec.ConfigKubernetes{}
+		env := spec.ConfigEnvironment{}
 
-		if initCmdOpt.name == "" {
-			cnf.Name = getFromUserOrDie(logger, "Give your environment a name", nil)
-		} else {
-			cnf.Name = initCmdOpt.name
+		name := initCmdOpt.name
+		if name == "" {
+			name = getFromUserOrDie(logger, "Give your environment a name", nil)
 		}
-		location := fmt.Sprintf("%s/.merlin/%s.json", os.Getenv("HOME"), cnf.Name)
+
+		// init references
+		{
+			cf.Name = name
+			kubernetes.Name = name
+			env.Name = name
+			env.Codefresh = name
+			env.Kubernetes = name
+		}
 
 		if initCmdOpt.codefresh.path == "" {
 			path := getFromUserOrDie(logger, "Path to codefresh config", nil)
-			cnf.Codefresh.Path = resolvePathOrDie(logger, path)
-		} else {
-			cnf.Codefresh.Path = initCmdOpt.codefresh.path
+			initCmdOpt.codefresh.path = resolvePathOrDie(logger, path)
 		}
+		cf.Path = initCmdOpt.codefresh.path
+
 		if initCmdOpt.codefresh.context == "" {
-			cf, err := codefresh.GetCFConfig(cnf.Codefresh.Path)
+			cf, err := codefresh.GetCFConfig(cf.Path)
 			dieIfError(logger, err)
 			items := []string{}
 			for _, c := range cf.Contexts {
@@ -85,43 +99,51 @@ var initCmd = &cobra.Command{
 				name = cf.CurrentContext
 			}
 
-			cnf.Codefresh.Context = name
-		} else {
-			cnf.Codefresh.Context = initCmdOpt.codefresh.context
+			initCmdOpt.codefresh.context = name
 		}
+		cf.Context = initCmdOpt.codefresh.context
 
 		if initCmdOpt.kubernetes.path == "" {
 			path := getFromUserOrDie(logger, "Path to kubeconfig", nil)
-			cnf.Kubernetes.Path = resolvePathOrDie(logger, path)
-		} else {
-			cnf.Kubernetes.Path = initCmdOpt.kubernetes.path
+			initCmdOpt.kubernetes.path = resolvePathOrDie(logger, path)
 		}
+		kubernetes.Path = initCmdOpt.kubernetes.path
 
 		if initCmdOpt.kubernetes.context == "" {
-			items, current, err := kube.GetKubeContexts(cnf.Kubernetes.Path)
+			items, current, err := kube.GetKubeContexts(kubernetes.Path)
 			dieIfError(logger, err)
 			name := getFromUserOrDie(logger, "Select kube context", items)
 			if name == "" {
 				name = current
 			}
-
-			cnf.Kubernetes.Context = name
-		} else {
-			cnf.Kubernetes.Context = initCmdOpt.kubernetes.context
+			initCmdOpt.kubernetes.context = name
 		}
+		kubernetes.Context = initCmdOpt.kubernetes.context
 
 		if initCmdOpt.environmentJs == "" {
 			path := getFromUserOrDie(logger, "Path to environment.js file", nil)
-			cnf.EnvironmentJS = resolvePathOrDie(logger, path)
-		} else {
-			cnf.EnvironmentJS = initCmdOpt.environmentJs
+			initCmdOpt.environmentJs = resolvePathOrDie(logger, path)
+		}
+		env.DescriptorLocation = initCmdOpt.environmentJs
+
+		values := map[string]interface{}{}
+		for _, value := range initCmdOpt.setList {
+			if err := strvals.ParseInto(value, values); err != nil {
+				dieIfError(logger, fmt.Errorf("failed parsing --set data: %s", err))
+			}
 		}
 
-		res, err := json.Marshal(cnf)
-		dieIfError(logger, err)
-		err = ioutil.WriteFile(location, res, 0644)
-		return err
+		err = mergo.Merge(&env.Values, values, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			dieIfError(logger, err)
+		}
 
+		cnf.CurrentEnvironment = name
+		cnf.Environments = append(cnf.Environments, env)
+		cnf.Codefresh = append(cnf.Codefresh, cf)
+		cnf.Kubernetes = append(cnf.Kubernetes, kubernetes)
+		err = utils.PersistConfigFile(cnf, fmt.Sprintf("%s/.merlin", os.Getenv("HOME")), "config.yaml")
+		dieIfError(logger, err)
 	},
 }
 

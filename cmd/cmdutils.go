@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -12,6 +13,7 @@ import (
 	"github.com/codefresh-io/merlin/pkg/js"
 	signalHandler "github.com/codefresh-io/merlin/pkg/signal"
 	"github.com/codefresh-io/merlin/pkg/spec"
+	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,4 +73,17 @@ func readMerlinEnvironmentFileOrDie(logger *logrus.Entry, path string) *spec.Env
 	dieIfError(logger, err)
 	return env
 
+}
+
+func getConfig(logger *logrus.Entry, path string, configName string) (*spec.ActiveConfig, error) {
+	if path == "" {
+		logger.Debug("Path is not passed, using default")
+		path = fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
+	}
+	cnf, err := utils.GetConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("Config file found, build active config")
+	return cnf.BuildActive(configName)
 }

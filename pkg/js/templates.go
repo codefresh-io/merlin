@@ -6,6 +6,63 @@ package js
 func TemplatesMap() map[string]string {
     templatesMap := make(map[string]string)
 
+templatesMap["classes.d.ts"] = `declare let _: any;
+declare let GetAvailablePort: any;
+declare class Environment {
+    version: string;
+    operators: Operator[];
+    components: Component[];
+    constructor();
+    setVersion(v: string): Environment;
+    addOperator(operator: Operator): Environment;
+    addComponent(component: Component): Environment;
+    build(): string;
+}
+declare class Component {
+    name: string;
+    spec: any;
+    constructor(name: string, spec: any);
+}
+declare class Param {
+    name: string;
+    description: string;
+    required: boolean;
+    envVar: string;
+    interactive: boolean;
+    constructor(opt: any);
+}
+declare class Operator {
+    name: string;
+    params: Param[];
+    description: string;
+    scope: string;
+    constructor(options: {
+        name: string;
+        description: string;
+        params: Param[];
+        scope: string;
+    });
+}
+declare class Command {
+    name: string;
+    description: string;
+    workDir: string;
+    exec: string[];
+    constructor(options: {
+        name: string;
+        description: string;
+        workDir: string;
+        exec: string[];
+    });
+}
+declare class CommandSet {
+    commands: Command[];
+    constructor();
+    addCommand(cmd: Command): CommandSet;
+    build(): string;
+}
+` 
+
 templatesMap["classes.js"] = `var Environment = /** @class */ (function () {
     function Environment() {
         this.operators = [];
@@ -86,6 +143,7 @@ var CommandSet = /** @class */ (function () {
 ` 
 
 templatesMap["classes.ts"] = `declare let _ : any
+declare let GetAvailablePort: any
 
 class Environment {
     version: string;
@@ -160,7 +218,7 @@ class Command {
     description: string;
     workDir: string;
     exec: string[];
-    constructor(options : { name: string; description: string; workDir: string; exec: string[]; }) {
+    constructor(options : { name: string; description: string; workDir: string ; exec: string[]; }) {
         this.name = options.name;
         this.description = options.description;
         this.workDir = options.workDir;
