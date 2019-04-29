@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"syscall"
 
 	"github.com/codefresh-io/merlin/pkg/commander"
 	"github.com/codefresh-io/merlin/pkg/js"
 	"github.com/codefresh-io/merlin/pkg/logger"
+	signalHandler "github.com/codefresh-io/merlin/pkg/signal"
 	"github.com/codefresh-io/merlin/pkg/spec"
 	"github.com/codefresh-io/merlin/pkg/strvals"
 	"github.com/imdario/mergo"
@@ -60,6 +62,15 @@ var testCmd = &cobra.Command{
 		if len(args) == 0 {
 			dieIfError(logger, fmt.Errorf("no operator passed"))
 		}
+
+		signalHandler := signalHandler.NewSignalhandler([]syscall.Signal{syscall.SIGTERM, syscall.SIGINT}, logger)
+		var gracefulStop = make(chan os.Signal)
+		signalHandler.Push(gracefulStop)
+		go func() {
+			logger.Debug("Wating to get signal")
+			sig := <-gracefulStop
+			gracefulStop <- sig
+		}()
 
 		ac, err := getConfig(logger, runCmdOpt.merlinconfigPath, runCmdOpt.env)
 		dieIfError(logger, err)
@@ -191,12 +202,13 @@ var testCmd = &cobra.Command{
 			logger.Debugf("cmd: %v", c)
 			if !runCmdOpt.dryRun {
 				cmd := commander.New(&commander.Options{
-					Program:  c.Program,
-					Args:     c.Exec,
-					Env:      c.Env,
-					Detached: c.Detached,
-					Logger:   logger,
-					WorkDir:  resolvePathOrDie(logger, c.WorkDir),
+					Program:       c.Program,
+					Args:          c.Exec,
+					Env:           c.Env,
+					Detached:      c.Detached,
+					Logger:        logger,
+					WorkDir:       resolvePathOrDie(logger, c.WorkDir),
+					SignalHandler: signalHandler,
 				})
 				err = cmd.Run()
 				if err != nil {
