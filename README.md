@@ -1,5 +1,7 @@
 # Merlin
 
+<img src="https://github.com/codefresh-io/merlin/blob/master/Merlin.png?raw=true" width="200" align="right">
+
 ```
 A command line application for a Codefresh developer
 
@@ -33,8 +35,6 @@ Use "merlin [command] --help" for more information about a command.
  ```
 
  ## Example
-
-<img src="https://github.com/codefresh-io/raw/master/Merlin.jpg" width="200" align="right">
 
 Show all operators that an environment exposes
 ```
