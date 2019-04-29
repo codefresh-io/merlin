@@ -6,7 +6,7 @@ build-local: build-classes
 
 build-classes:
 	@echo "Compiling ts into js"
-	@tsc --out hack/js/classes.js hack/js/classes.ts --target ES5 --lib es2015 -d
+	@tsc --out hack/js/classes.js hack/js/classes.ts --target ES5 --lib es2015
 	@echo "Generating go code from JS"
 	@go generate hack/generate.go
 	@echo "Moving generated code into js package at /pkg/js"

@@ -26,20 +26,24 @@ import (
 )
 
 var describeOperatorCmdOpt struct {
-	environment string
+	environment  string
+	merlinconfig string
 }
 
 var describeOperatorCmd = &cobra.Command{
 	Use:   "operator",
 	Short: "Show a list of all operators exposed",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		logger := logger.New(&logger.LoggerOptions{
 			Fields: map[string]interface{}{
 				"Command": "List",
 			},
 			Debug: verbose,
 		})
-		env := readMerlinEnvironmentFileOrDie(logger, describeOperatorCmdOpt.environment)
+		ac, err := getConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
+		dieIfError(logger, err)
+
+		env := readMerlinEnvironmentFileOrDie(logger, ac.EnvironmentJS)
 
 		logger.Debug("Printing table")
 		t := table.New(&table.Options{
@@ -78,12 +82,11 @@ var describeOperatorCmd = &cobra.Command{
 			}
 			t.Table().Render()
 		}
-		return nil
 	},
 }
 
 func init() {
 	describeCmd.AddCommand(describeOperatorCmd)
-	describeOperatorCmd.Flags().StringVar(&describeOperatorCmdOpt.environment, "environment", viper.GetString("MERLIN_ENVIRONMENT"), "Paht to environment.js file [$MERLIN_ENVIRONMENT]")
-	describeOperatorCmd.MarkFlagRequired("environment")
+	describeOperatorCmd.Flags().StringVar(&describeOperatorCmdOpt.merlinconfig, "merlinconfig", viper.GetString("MERLIN_CONFIG"), "Path to merlinconfig file (default $HOME/.merlin/config) [$MERLIN_CONFIG]")
+	describeOperatorCmd.Flags().StringVar(&describeOperatorCmdOpt.environment, "environment", viper.GetString("MERLIN_ENVIRONMENT"), "Name of the environment from merlinconfig [$MERLIN_ENVIRONMENT]")
 }
