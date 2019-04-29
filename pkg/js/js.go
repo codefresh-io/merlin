@@ -3,6 +3,8 @@ package js
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/robertkrimen/otto"
 
@@ -61,6 +63,9 @@ func (r *runner) Load(scripts []string, input map[string]interface{}) (*otto.Val
 		v, _ := r.vm.ToValue(p)
 		return v
 	})
+	r.vm.Set("process", map[string]interface{}{
+		"env": getProcessEnv(),
+	})
 	res, err := r.vm.Run(global)
 	if err != nil {
 		return nil, err
@@ -78,4 +83,15 @@ func (r *runner) CallFn(name string, input ...interface{}) (*otto.Value, error) 
 		return &res, err
 	}
 	return nil, errors.New(undefinedError)
+}
+
+func getProcessEnv() map[string]string {
+	processEnv := map[string]string{}
+	{
+		for _, env := range os.Environ() {
+			res := strings.Split(env, "=")
+			processEnv[res[0]] = strings.Join(res[1:], "=")
+		}
+	}
+	return processEnv
 }

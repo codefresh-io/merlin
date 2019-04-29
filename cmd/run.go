@@ -67,6 +67,7 @@ var testCmd = &cobra.Command{
 		logger.Debugf("Reading environment.js file from %s", ac.EnvironmentJS)
 		f, err := ioutil.ReadFile(ac.EnvironmentJS)
 		dieIfError(logger, err)
+
 		logger.Debug("Creating new JS engine")
 		jsEngine := js.NewJSEngine()
 
