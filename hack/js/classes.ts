@@ -74,11 +74,13 @@ class Command {
     description: string;
     workDir: string;
     exec: string[];
-    constructor(options : { name: string; description: string; workDir: string ; exec: string[]; }) {
+    program: string;
+    constructor(options : { name: string; description: string; workDir: string ; exec: string[]; program: string; }) {
         this.name = options.name;
         this.description = options.description;
         this.workDir = options.workDir;
         this.exec = options.exec;
+        this.program = options.program;
     }
 };
 

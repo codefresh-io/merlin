@@ -57,6 +57,7 @@ var Command = /** @class */ (function () {
         this.description = options.description;
         this.workDir = options.workDir;
         this.exec = options.exec;
+        this.program = options.program;
     }
     return Command;
 }());

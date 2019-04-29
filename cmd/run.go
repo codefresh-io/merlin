@@ -190,8 +190,8 @@ var testCmd = &cobra.Command{
 			logger.Debugf("cmd: %v", c)
 			if !runCmdOpt.dryRun {
 				cmd := commander.New(&commander.Options{
-					Program:  c.Exec[0],
-					Args:     c.Exec[1:],
+					Program:  c.Program,
+					Args:     c.Exec,
 					Env:      c.Env,
 					Detached: c.Detached,
 					Logger:   logger,
