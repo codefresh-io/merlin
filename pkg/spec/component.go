@@ -12,7 +12,7 @@ type (
 	}
 )
 
-func (c *Component) ToJSON() map[string]interface{} {
+func (c *Component) ToJSObject() map[string]interface{} {
 	res := map[string]interface{}{}
 	b, err := json.Marshal(c)
 	if err != nil {
@@ -25,4 +25,13 @@ func (c *Component) ToJSON() map[string]interface{} {
 		return res
 	}
 	return res
+}
+
+func (c *Component) ToJSONString() string {
+	b, err := json.Marshal(c)
+	if err != nil {
+		fmt.Printf("Error marshalling: %s\n", err.Error())
+		return ""
+	}
+	return string(b)
 }

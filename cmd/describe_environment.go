@@ -44,8 +44,8 @@ var describeEnvCmd = &cobra.Command{
 
 		env := readMerlinEnvironmentFileOrDie(logger, ac.EnvironmentJS)
 
-		logger.Debug("Printing table")
-		t := table.New(&table.Options{
+		logger.Debug("Printing operator table")
+		operatorTable := table.New(&table.Options{
 			Headers: []string{"Operator", "Description"},
 		})
 		for _, o := range env.Operators {
@@ -56,12 +56,24 @@ var describeEnvCmd = &cobra.Command{
 			if len(o.Description) > 30 {
 				description = fmt.Sprintf("%s...", o.Description[:30])
 			}
-			t.Table().Append([]string{
+			operatorTable.Table().Append([]string{
 				fmt.Sprintf("%s (%s)", o.Name, o.Scope),
 				description,
 			})
 		}
-		t.Table().Render()
+		operatorTable.Table().Render()
+
+		logger.Debug("Printing compoent table")
+		componentTable := table.New(&table.Options{
+			Headers: []string{"Component", "Spec"},
+		})
+		for _, c := range env.Components {
+			componentTable.Table().Append([]string{
+				c.Name,
+				c.ToJSONString(),
+			})
+		}
+		componentTable.Table().Render()
 	},
 }
 

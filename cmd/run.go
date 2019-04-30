@@ -187,7 +187,7 @@ var testCmd = &cobra.Command{
 			dieIfError(logger, err)
 		}
 
-		execArr, err := jsEngine.CallFn(fmt.Sprintf("$%s", runCmdOpt.operator.Name), input, runCmdOpt.component.ToJSON())
+		execArr, err := jsEngine.CallFn(fmt.Sprintf("$%s", runCmdOpt.operator.Name), input, runCmdOpt.component.ToJSObject())
 		if err != nil {
 			dieIfError(logger, err)
 		}
