@@ -23,6 +23,10 @@ Use "merlin [command] --help" for more information about a command.
 ```
 
 ## Installation
+* MacOS:
+  * `brew tap codefresh-io/merlin`
+  * `brew install merlin`
+
 * Prerequisite:
     * [codefresh cli](http://cli.codefresh.io)
     * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl)
