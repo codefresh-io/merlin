@@ -75,15 +75,21 @@ func readMerlinEnvironmentFileOrDie(logger *logrus.Entry, path string) *spec.Env
 
 }
 
-func getConfig(logger *logrus.Entry, path string, configName string) (*spec.ActiveConfig, error) {
+func getConfig(logger *logrus.Entry, path string, configName string) (*spec.MerlinConfig, error) {
 	if path == "" {
 		logger.Debug("Path is not passed, using default")
 		path = fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
 	}
 	cnf, err := utils.GetConfigFile(path)
+	return cnf, err
+}
+
+func getActiveConfig(logger *logrus.Entry, path string, configName string) (*spec.ActiveConfig, error) {
+	cnf, err := getConfig(logger, path, configName)
 	if err != nil {
 		return nil, err
 	}
 	logger.Debug("Config file found, build active config")
 	return cnf.BuildActive(configName)
+
 }

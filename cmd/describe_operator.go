@@ -46,7 +46,7 @@ var describeOperatorCmd = &cobra.Command{
 		if len(args) == 0 {
 			dieIfError(logger, fmt.Errorf("no operator passed"))
 		}
-		ac, err := getConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
+		ac, err := getActiveConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
 		dieIfError(logger, err)
 
 		env := readMerlinEnvironmentFileOrDie(logger, ac.EnvironmentJS)

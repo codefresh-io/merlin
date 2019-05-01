@@ -39,7 +39,7 @@ var describeEnvCmd = &cobra.Command{
 			},
 			Debug: verbose,
 		})
-		ac, err := getConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
+		ac, err := getActiveConfig(logger, describeEnvCmdOpt.merlinconfig, describeEnvCmdOpt.environment)
 		dieIfError(logger, err)
 
 		env := readMerlinEnvironmentFileOrDie(logger, ac.EnvironmentJS)

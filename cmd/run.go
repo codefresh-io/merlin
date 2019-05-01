@@ -72,7 +72,7 @@ var testCmd = &cobra.Command{
 			gracefulStop <- sig
 		}()
 
-		ac, err := getConfig(logger, runCmdOpt.merlinconfigPath, runCmdOpt.env)
+		ac, err := getActiveConfig(logger, runCmdOpt.merlinconfigPath, runCmdOpt.env)
 		dieIfError(logger, err)
 
 		logger.Debugf("Reading environment.js file from %s", ac.EnvironmentJS)
@@ -170,7 +170,7 @@ var testCmd = &cobra.Command{
 		}
 
 		logger.Debugf("Executing operator %s", runCmdOpt.operator.Name)
-		input := ac.ToJSON()
+		input := ac.ToJSObject()
 		err = mergo.Merge(&input, params, mergo.WithOverride, mergo.WithAppendSlice)
 		if err != nil {
 			dieIfError(logger, err)

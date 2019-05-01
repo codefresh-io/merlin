@@ -47,7 +47,7 @@ type (
 	}
 )
 
-func (m *ActiveConfig) ToJSON() map[string]interface{} {
+func (m *ActiveConfig) ToJSObject() map[string]interface{} {
 	res := map[string]interface{}{}
 	b, err := json.Marshal(m)
 	if err != nil {
@@ -60,6 +60,15 @@ func (m *ActiveConfig) ToJSON() map[string]interface{} {
 		return res
 	}
 	return res
+}
+
+func (m *ActiveConfig) ToJSONString() string {
+	b, err := json.Marshal(m)
+	if err != nil {
+		fmt.Printf("Error marshalling: %s\n", err.Error())
+		return ""
+	}
+	return string(b)
 }
 
 func (m *MerlinConfig) BuildActive(name string) (*ActiveConfig, error) {

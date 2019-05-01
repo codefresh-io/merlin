@@ -64,10 +64,6 @@ var initCmd = &cobra.Command{
 		cnf, err := utils.GetConfigFile(location)
 		dieIfError(logger, err)
 
-		cf := spec.ConfigCodefresh{}
-		kubernetes := spec.ConfigKubernetes{}
-		env := spec.ConfigEnvironment{}
-
 		name := initCmdOpt.name
 		if name == "" {
 			defaultEnvName := ""
@@ -77,6 +73,16 @@ var initCmd = &cobra.Command{
 			}
 			name = getFromUserOrDie(logger, "Give your environment a name", nil, defaultEnvName)
 		}
+
+		for _, e := range cnf.Environments {
+			if e.Name == name {
+				dieIfError(logger, fmt.Errorf("Environment with name %s already exists", name))
+			}
+		}
+
+		cf := spec.ConfigCodefresh{}
+		kubernetes := spec.ConfigKubernetes{}
+		env := spec.ConfigEnvironment{}
 
 		// init references
 		{
