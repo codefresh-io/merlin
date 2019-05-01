@@ -19,6 +19,7 @@ limitations under the License.
 import (
 	"fmt"
 	"os"
+	"os/user"
 
 	codefresh "github.com/codefresh-io/go-sdk/pkg/utils"
 	"github.com/codefresh-io/merlin/pkg/kube"
@@ -69,7 +70,12 @@ var initCmd = &cobra.Command{
 
 		name := initCmdOpt.name
 		if name == "" {
-			name = getFromUserOrDie(logger, "Give your environment a name", nil)
+			defaultEnvName := ""
+			u, _ := user.Current()
+			if u != nil {
+				defaultEnvName = u.Username
+			}
+			name = getFromUserOrDie(logger, "Give your environment a name", nil, defaultEnvName)
 		}
 
 		// init references
@@ -82,7 +88,7 @@ var initCmd = &cobra.Command{
 		}
 
 		if initCmdOpt.codefresh.path == "" {
-			initCmdOpt.codefresh.path = getFromUserOrDie(logger, "Path to codefresh config", nil)
+			initCmdOpt.codefresh.path = getFromUserOrDie(logger, "Set path to codefresh config file", nil, fmt.Sprintf("%s/.cfconfig", os.Getenv("HOME")))
 		}
 		cf.Path = resolvePathOrDie(logger, initCmdOpt.codefresh.path)
 
@@ -93,7 +99,7 @@ var initCmd = &cobra.Command{
 			for _, c := range cf.Contexts {
 				items = append(items, c.Name)
 			}
-			name := getFromUserOrDie(logger, "Select codefresh context", items)
+			name := getFromUserOrDie(logger, "Select codefresh context to be used", items, "")
 			if name == "" {
 				name = cf.CurrentContext
 			}
@@ -103,14 +109,14 @@ var initCmd = &cobra.Command{
 		cf.Context = initCmdOpt.codefresh.context
 
 		if initCmdOpt.kubernetes.path == "" {
-			initCmdOpt.kubernetes.path = getFromUserOrDie(logger, "Path to kubeconfig", nil)
+			initCmdOpt.kubernetes.path = getFromUserOrDie(logger, "Set path to Kubernetes config file (kubeconfig)", nil, fmt.Sprintf("%s/.kube/config", os.Getenv("HOME")))
 		}
 		kubernetes.Path = resolvePathOrDie(logger, initCmdOpt.kubernetes.path)
 
 		if initCmdOpt.kubernetes.context == "" {
 			items, current, err := kube.GetKubeContexts(kubernetes.Path)
 			dieIfError(logger, err)
-			name := getFromUserOrDie(logger, "Select kube context", items)
+			name := getFromUserOrDie(logger, "Select Kubernetes context to be used", items, "")
 			if name == "" {
 				name = current
 			}
@@ -119,7 +125,7 @@ var initCmd = &cobra.Command{
 		kubernetes.Context = initCmdOpt.kubernetes.context
 
 		if initCmdOpt.environmentJs == "" {
-			initCmdOpt.environmentJs = getFromUserOrDie(logger, "Path to environment.js file", nil)
+			initCmdOpt.environmentJs = getFromUserOrDie(logger, "Set path to environment.js file", nil, "")
 		}
 		env.DescriptorLocation = resolvePathOrDie(logger, initCmdOpt.environmentJs)
 
@@ -144,7 +150,7 @@ var initCmd = &cobra.Command{
 	},
 }
 
-func getFromUserOrDie(logger *logrus.Entry, label string, items []string) string {
+func getFromUserOrDie(logger *logrus.Entry, label string, items []string, defaultValue string) string {
 	var res string
 	var err error
 	if items != nil && len(items) > 0 {
@@ -155,7 +161,8 @@ func getFromUserOrDie(logger *logrus.Entry, label string, items []string) string
 		_, res, err = p.Run()
 	} else {
 		p := promptui.Prompt{
-			Label: label,
+			Label:   label,
+			Default: defaultValue,
 		}
 		res, err = p.Run()
 	}
