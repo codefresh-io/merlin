@@ -22,3 +22,16 @@ changelog:
     exclude:
     - '^docs:'
     - '^test:'
+brew:
+  github:
+    owner: codefresh-io
+    name: homebrew-merlin
+  folder: Formula
+  description: "merlin --help"
+  homepage: "http://docs.codefresh.io"
+  commit_author:
+    name: Oleg Sucharevich
+    email: olegs@codefresh.io
+
+  install: |
+      bin.install "merlin"
