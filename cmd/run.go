@@ -221,9 +221,9 @@ var testCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(testCmd)
-	testCmd.Flags().StringVar(&runCmdOpt.componentName, "component", viper.GetString("MERLIN_COMPONENT"), "Name of the component to be execute as part of the operator [$MERLIN_COMPONENT]")
+	testCmd.Flags().StringVarP(&runCmdOpt.componentName, "component", "c", viper.GetString("MERLIN_COMPONENT"), "Name of the component to be execute as part of the operator [$MERLIN_COMPONENT]")
 	testCmd.Flags().StringVar(&runCmdOpt.merlinconfigPath, "merlinconfig", viper.GetString("MERLIN_CONFIG"), "Path to merlinconfig file (default $HOME/.merlin/config) [$MERLIN_CONFIG]")
-	testCmd.Flags().StringVar(&runCmdOpt.env, "environment", viper.GetString("MERLIN_ENVIRONMENT"), "Name of the environment from merlinconfig [$MERLIN_ENVIRONMENT]")
+	testCmd.Flags().StringVarP(&runCmdOpt.env, "environment", "e", viper.GetString("MERLIN_ENVIRONMENT"), "Name of the environment from merlinconfig [$MERLIN_ENVIRONMENT]")
 	testCmd.Flags().StringArrayVar(&runCmdOpt.setList, "set", []string{}, "--set name=value OR --set key.inner_key=value")
 	testCmd.Flags().BoolVar(&runCmdOpt.dryRun, "dry-run", false, "Dry run")
 }
