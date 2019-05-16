@@ -14,8 +14,9 @@ type (
 			Context string `json:"context"`
 		} `json:"codefresh"`
 		Kubernetes struct {
-			Path    string `json:"path"`
-			Context string `json:"context"`
+			Path      string `json:"path"`
+			Context   string `json:"context"`
+			Namespace string `json:"namespace"`
 		} `json:"kubernetes"`
 		Values map[string]interface{} `json:"values"`
 	}
@@ -41,9 +42,10 @@ type (
 	}
 
 	ConfigKubernetes struct {
-		Name    string `json:"name" yaml:"name"`
-		Path    string `json:"path" yaml:"path"`
-		Context string `json:"context" yaml:"context"`
+		Name      string `json:"name" yaml:"name"`
+		Path      string `json:"path" yaml:"path"`
+		Context   string `json:"context" yaml:"context"`
+		Namespace string `json:"namespace" yaml:"namespace"`
 	}
 )
 
@@ -108,6 +110,7 @@ func (m *MerlinConfig) BuildActive(name string) (*ActiveConfig, error) {
 			foundKube = true
 			ac.Kubernetes.Path = k.Path
 			ac.Kubernetes.Context = k.Context
+			ac.Kubernetes.Namespace = k.Namespace
 		}
 	}
 	if !foundKube {
