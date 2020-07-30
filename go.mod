@@ -13,13 +13,9 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/manifoldco/promptui v0.3.2
-	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/nicksnyder/go-i18n v1.10.0 // indirect
-	github.com/olekukonko/tablewriter v0.0.1
-	github.com/onrik/logrus v0.2.1
-	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/afero v1.2.0 // indirect
 	github.com/spf13/cobra v0.0.3
