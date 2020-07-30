@@ -21,27 +21,17 @@ import (
 	"os"
 	"os/user"
 
-	codefresh "github.com/codefresh-io/go-sdk/pkg/utils"
+	"github.com/codefresh-io/go/logger"
 	"github.com/codefresh-io/merlin/pkg/kube"
-	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/codefresh-io/merlin/pkg/spec"
-	"github.com/codefresh-io/merlin/pkg/strvals"
 	"github.com/codefresh-io/merlin/pkg/utils"
-	"github.com/imdario/mergo"
 	"github.com/manifoldco/promptui"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var initCmdOpt struct {
-	name          string
-	setList       []string
-	environmentJs string
-	codefresh     struct {
-		path    string
-		context string
-	}
+	name       string
 	kubernetes struct {
 		path    string
 		context string
@@ -53,16 +43,14 @@ var initCmd = &cobra.Command{
 	Short: "init",
 	Run: func(cmd *cobra.Command, args []string) {
 		location := fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
-		logger := logger.New(&logger.LoggerOptions{
-			Fields: map[string]interface{}{
-				"Command":  "Run",
-				"Location": location,
+		logger, err := logger.New(logger.Options{
+			Context: []interface{}{
+				"Command", "Run",
+				"Location", location,
 			},
-			Debug: verbose,
 		})
-		logger.Debugf("Starting init process - %v", initCmdOpt)
-		cnf, err := utils.GetConfigFile(location)
-		dieIfError(logger, err)
+		dieOnError("Failed to create logger", err)
+		logger.Debug("Starting init process", "cmd", initCmdOpt)
 
 		name := initCmdOpt.name
 		if name == "" {
@@ -71,92 +59,41 @@ var initCmd = &cobra.Command{
 			if u != nil {
 				defaultEnvName = u.Username
 			}
-			name = getFromUserOrDie(logger, "Give your environment a name", nil, defaultEnvName)
+			name = getFromUserOrDie(logger, "Set environment name", nil, defaultEnvName)
 		}
-
-		for _, e := range cnf.Environments {
-			if e.Name == name {
-				dieIfError(logger, fmt.Errorf("Environment with name %s already exists", name))
-			}
-		}
-
-		cf := spec.ConfigCodefresh{}
-		kubernetes := spec.ConfigKubernetes{}
-		env := spec.ConfigEnvironment{}
-
-		// init references
-		{
-			cf.Name = name
-			kubernetes.Name = name
-			env.Name = name
-			env.Codefresh = name
-			env.Kubernetes = name
-		}
-
-		if initCmdOpt.codefresh.path == "" {
-			initCmdOpt.codefresh.path = getFromUserOrDie(logger, "Set path to codefresh config file", nil, fmt.Sprintf("%s/.cfconfig", os.Getenv("HOME")))
-		}
-		cf.Path = resolvePathOrDie(logger, initCmdOpt.codefresh.path)
-
-		if initCmdOpt.codefresh.context == "" {
-			cf, err := codefresh.GetCFConfig(cf.Path)
-			dieIfError(logger, err)
-			items := []string{}
-			for _, c := range cf.Contexts {
-				items = append(items, c.Name)
-			}
-			name := getFromUserOrDie(logger, "Select codefresh context to be used", items, "")
-			if name == "" {
-				name = cf.CurrentContext
-			}
-
-			initCmdOpt.codefresh.context = name
-		}
-		cf.Context = initCmdOpt.codefresh.context
 
 		if initCmdOpt.kubernetes.path == "" {
 			initCmdOpt.kubernetes.path = getFromUserOrDie(logger, "Set path to Kubernetes config file (kubeconfig)", nil, fmt.Sprintf("%s/.kube/config", os.Getenv("HOME")))
 		}
-		kubernetes.Path = resolvePathOrDie(logger, initCmdOpt.kubernetes.path)
+		kubePath := resolvePathOrDie(logger, initCmdOpt.kubernetes.path)
 
 		if initCmdOpt.kubernetes.context == "" {
-			items, current, err := kube.GetKubeContexts(kubernetes.Path)
-			dieIfError(logger, err)
+			items, current, err := kube.GetKubeContexts(kubePath)
+			dieOnError("Failed to get context from kubeconfig file", err)
 			name := getFromUserOrDie(logger, "Select Kubernetes context to be used", items, "")
 			if name == "" {
 				name = current
 			}
 			initCmdOpt.kubernetes.context = name
 		}
-		kubernetes.Context = initCmdOpt.kubernetes.context
-
-		if initCmdOpt.environmentJs == "" {
-			initCmdOpt.environmentJs = getFromUserOrDie(logger, "Set path to environment.js file", nil, "")
+		kubeContext := initCmdOpt.kubernetes.context
+		kubenamespace := getFromUserOrDie(logger, "Namespace", nil, name)
+		shell := getFromUserOrDie(logger, "What is your shell?", nil, "bash")
+		cnf := &spec.Config{
+			Name: name,
+			Cluster: spec.Cluster{
+				Context:   kubeContext,
+				Namespace: kubenamespace,
+				Path:      kubePath,
+			},
+			Shell: shell,
 		}
-		env.DescriptorLocation = resolvePathOrDie(logger, initCmdOpt.environmentJs)
-
-		values := map[string]interface{}{}
-		for _, value := range initCmdOpt.setList {
-			if err := strvals.ParseInto(value, values); err != nil {
-				dieIfError(logger, fmt.Errorf("failed parsing --set data: %s", err))
-			}
-		}
-
-		err = mergo.Merge(&env.Values, values, mergo.WithOverride, mergo.WithAppendSlice)
-		if err != nil {
-			dieIfError(logger, err)
-		}
-
-		cnf.CurrentEnvironment = name
-		cnf.Environments = append(cnf.Environments, env)
-		cnf.Codefresh = append(cnf.Codefresh, cf)
-		cnf.Kubernetes = append(cnf.Kubernetes, kubernetes)
 		err = utils.PersistConfigFile(cnf, fmt.Sprintf("%s/.merlin", os.Getenv("HOME")), "config.yaml")
-		dieIfError(logger, err)
+		dieOnError("Failed to persist config file", err)
 	},
 }
 
-func getFromUserOrDie(logger *logrus.Entry, label string, items []string, defaultValue string) string {
+func getFromUserOrDie(logger logger.Logger, label string, items []string, defaultValue string) string {
 	var res string
 	var err error
 	if items != nil && len(items) > 0 {
@@ -172,21 +109,13 @@ func getFromUserOrDie(logger *logrus.Entry, label string, items []string, defaul
 		}
 		res, err = p.Run()
 	}
-	dieIfError(logger, err)
+	dieOnError("Failed to get input", err)
 	return res
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-
-	initCmd.Flags().StringArrayVar(&initCmdOpt.setList, "set", []string{}, "--set name=value OR --set key.inner_key=value")
-
 	initCmd.Flags().StringVar(&initCmdOpt.name, "name", viper.GetString("MERLIN_ENVIRONMENT_NAME"), "Set environment name [$MERLIN_ENVIRONMENT_NAME]")
-	initCmd.Flags().StringVar(&initCmdOpt.environmentJs, "environment", viper.GetString("MERLIN_ENVIRONMENT_JS_PATH"), "Set path to environment.js file [$MERLIN_ENVIRONMENT_JS_PATH]")
-
-	initCmd.Flags().StringVar(&initCmdOpt.codefresh.path, "codefresh-config-path", viper.GetString("CODEFRESH_CONFIG"), "")
-	initCmd.Flags().StringVar(&initCmdOpt.codefresh.context, "codefresh-config-context", viper.GetString("CODEFRESH_CONTEXT"), "")
-
 	initCmd.Flags().StringVar(&initCmdOpt.kubernetes.path, "kubernetes-config-path", viper.GetString("KUBECONFIG"), "")
 	initCmd.Flags().StringVar(&initCmdOpt.kubernetes.context, "kubernetes-config-context", viper.GetString("KUBE_CONTEXT"), "")
 }

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/codefresh-io/merlin/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -29,19 +28,13 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print merlin version",
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.New(&logger.LoggerOptions{
-			Fields: map[string]interface{}{
-				"Command": "Version",
-			},
-			Debug: verbose,
-		})
 		v := map[string]interface{}{
 			"Version": version,
 			"Commit":  commit,
 			"Date":    date,
 		}
 		b, err := json.Marshal(v)
-		dieIfError(log, err)
+		dieOnError("Failed to marshal struct", err)
 		fmt.Println(string(b))
 	},
 }

@@ -2,33 +2,31 @@ package commander
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/codefresh-io/go/logger"
 )
 
 type (
 	Command interface {
-		Run() error
+		Run(context.Context) error
+		DryRun() string
 	}
 
 	cmd struct {
-		program       string
-		args          []string
-		env           []string
-		stdout        *os.File
-		stdin         *os.File
-		stderr        *os.File
-		logger        logger
-		ctx           context.Context
-		detached      bool
-		workDir       string
-		signalHandler signalHandler
-	}
-
-	logger interface {
-		Debugf(format string, args ...interface{})
-		Debug(args ...interface{})
+		program  string
+		args     []string
+		env      []string
+		stdout   *os.File
+		stdin    *os.File
+		stderr   *os.File
+		logger   logger.Logger
+		ctx      context.Context
+		detached bool
+		workDir  string
 	}
 
 	signalHandler interface {
@@ -37,13 +35,12 @@ type (
 	}
 
 	Options struct {
-		Program       string
-		Args          []string
-		Env           []string
-		Detached      bool
-		Logger        logger
-		WorkDir       string
-		SignalHandler signalHandler
+		Program  string
+		Args     []string
+		Env      []string
+		Detached bool
+		Logger   logger.Logger
+		WorkDir  string
 	}
 )
 
@@ -65,11 +62,7 @@ func New(opt *Options) Command {
 	return c
 }
 
-func (c *cmd) Run() error {
-	var gracefulStop = make(chan os.Signal)
-	c.signalHandler.Push(gracefulStop)
-	c.signalHandler.Process()
-
+func (c *cmd) Run(context context.Context) error {
 	command := exec.CommandContext(c.ctx, c.program, c.args...)
 	command.Env = append(os.Environ(), c.env...)
 	if c.workDir != "" {
@@ -83,19 +76,24 @@ func (c *cmd) Run() error {
 	command.Stdout = c.stdout
 	command.Stdin = c.stdin
 	command.Stderr = c.stderr
-
+	c.logger.Debug("Starting command", "workdir", c.workDir, "program", c.program, "arguments", c.args, "envs", c.env)
 	err := command.Start()
 	if err != nil {
 		return err
 	}
 	go func(pid int) {
-		c.logger.Debugf("Started go rutine to handle signal for process PPID: %d\n", pid)
-		sig := <-gracefulStop
-		c.logger.Debugf("Killing process %d\n", pid)
-		syscall.Kill(-pid, syscall.SIGKILL)
-		gracefulStop <- sig
+		c.logger.Debug("Started go rutine to handle signal for process PPID", "pid", pid)
+		select {
+		case <-context.Done():
+			c.logger.Debug("Killing process", "pid", pid)
+			syscall.Kill(-pid, syscall.SIGKILL)
+		}
 	}(command.Process.Pid)
 
 	err = command.Wait()
 	return err
+}
+
+func (c *cmd) DryRun() string {
+	return fmt.Sprintf("workdir: %s --- envs: %v --- cmd: %s %s", c.workDir, c.env, c.program, c.args)
 }
