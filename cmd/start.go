@@ -39,7 +39,7 @@ var startCmd = &cobra.Command{
 		dieOnError("Failed to create logger", err)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		go startSignalHandler(cancel)
+		go startSignalHandler(logger, cancel)
 
 		logger.Debug("Loading service.yaml file")
 		pwd, err := os.Getwd()

@@ -47,17 +47,16 @@ type (
 func New(opt *Options) Command {
 	ctx := context.Background()
 	c := &cmd{
-		stderr:        os.Stderr,
-		stdout:        os.Stdout,
-		stdin:         os.Stdin,
-		program:       opt.Program,
-		args:          opt.Args,
-		env:           opt.Env,
-		ctx:           ctx,
-		detached:      opt.Detached,
-		logger:        opt.Logger,
-		workDir:       opt.WorkDir,
-		signalHandler: opt.SignalHandler,
+		stderr:   os.Stderr,
+		stdout:   os.Stdout,
+		stdin:    os.Stdin,
+		program:  opt.Program,
+		args:     opt.Args,
+		env:      opt.Env,
+		ctx:      ctx,
+		detached: opt.Detached,
+		logger:   opt.Logger,
+		workDir:  opt.WorkDir,
 	}
 	return c
 }

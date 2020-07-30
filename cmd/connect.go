@@ -37,7 +37,7 @@ var connectCmd = &cobra.Command{
 		})
 		dieOnError("Failed to create logger", err)
 		ctx, cancel := context.WithCancel(context.Background())
-		go startSignalHandler(cancel)
+		go startSignalHandler(logger, cancel)
 
 		location := fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
 		cnf, err := getConfig(nil, location)
@@ -54,14 +54,16 @@ var connectCmd = &cobra.Command{
 			fmt.Sprintf("%s-%s-base", cnf.Name, svc.Name),
 			"--context", cnf.Cluster.Context,
 			"--namespace", cnf.Cluster.Namespace,
-			"--run", cnf.Shell,
+		}
+		if cnf.Shell != "" {
+			tpArgs = append(tpArgs, []string{"--run", cnf.Shell}...)
 		}
 		tpEnv := []string{}
 		for _, p := range svc.Ports {
 			port, err := utils.GetAvailablePort()
 			dieOnError("Failed to generate port", err)
 			tpArgs = append(tpArgs, []string{"--expose", fmt.Sprintf("%d:%d", port, p.Default)}...)
-			tpEnv = append(tpEnv, fmt.Sprintf("merlin_generated_%s=%d", p.EnvVar, p.Default))
+			tpEnv = append(tpEnv, fmt.Sprintf("merlin_generated_%s=%d", p.EnvVar, port))
 		}
 
 		for _, e := range svc.Environment {
@@ -69,13 +71,12 @@ var connectCmd = &cobra.Command{
 		}
 
 		opt := &commander.Options{
-			Program:       "telepresence",
-			Detached:      true,
-			Logger:        logger,
-			Args:          tpArgs,
-			WorkDir:       pwd,
-			Env:           tpEnv,
-			SignalHandler: signalHandler,
+			Program:  "telepresence",
+			Detached: true,
+			Logger:   logger,
+			Args:     tpArgs,
+			WorkDir:  pwd,
+			Env:      tpEnv,
 		}
 
 		tpCmd := commander.New(opt)
