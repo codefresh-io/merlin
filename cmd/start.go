@@ -58,12 +58,12 @@ var startCmd = &cobra.Command{
 				continue
 			}
 			original := strings.Split(kv[0], "merlin_generated_")
-			tpEnv = append(tpEnv, original[1], kv[1])
+			tpEnv = append(tpEnv, fmt.Sprintf("%s=%s", original[1], kv[1]))
 		}
 
 		opt := &commander.Options{
 			Program:  args[0],
-			Detached: false,
+			Detached: true,
 			Logger:   logger,
 			Args:     args[1:],
 			WorkDir:  pwd,
