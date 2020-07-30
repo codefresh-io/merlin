@@ -29,8 +29,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var startCmdOpt struct{}
-
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "start",

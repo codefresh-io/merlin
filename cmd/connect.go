@@ -26,16 +26,7 @@ import (
 	"github.com/codefresh-io/merlin/pkg/commander"
 	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
-
-var connectCmdOpt struct {
-	name       string
-	kubernetes struct {
-		path    string
-		context string
-	}
-}
 
 var connectCmd = &cobra.Command{
 	Use:   "connect",
@@ -97,7 +88,4 @@ var connectCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(connectCmd)
-	connectCmd.Flags().StringVar(&connectCmdOpt.name, "name", viper.GetString("MERLIN_ENVIRONMENT_NAME"), "Set environment name [$MERLIN_ENVIRONMENT_NAME]")
-	connectCmd.Flags().StringVar(&connectCmdOpt.kubernetes.path, "kubernetes-config-path", viper.GetString("KUBECONFIG"), "")
-	connectCmd.Flags().StringVar(&connectCmdOpt.kubernetes.context, "kubernetes-config-context", viper.GetString("KUBE_CONTEXT"), "")
 }

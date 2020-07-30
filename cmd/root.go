@@ -26,11 +26,6 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
-
-	// flags
-	verbose      bool
-	merlinconfig string
-	noCache      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -45,5 +40,4 @@ func Execute() {
 
 func init() {
 	viper.AutomaticEnv()
-	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "get extra logs")
 }
