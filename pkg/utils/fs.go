@@ -2,31 +2,24 @@ package utils
 
 import (
 	"fmt"
-	"github.com/codefresh-io/merlin/pkg/spec"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+
+	"github.com/codefresh-io/merlin/pkg/spec"
+	"gopkg.in/yaml.v2"
 )
 
-func GetConfigFile(path string) (*spec.MerlinConfig, error) {
-	cnf := &spec.MerlinConfig{}
+func GetConfigFile(path string) (*spec.Config, error) {
+	cnf := &spec.Config{}
 	f, err := ioutil.ReadFile(path)
-	if os.IsNotExist(err) {
-		dir, err := filepath.Abs(filepath.Dir(path))
-		if err != nil {
-			return nil, err
-		}
-		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return nil, err
-		}
-		return cnf, nil
+	if err != nil {
+		return nil, err
 	}
 	err = yaml.Unmarshal(f, cnf)
 	return cnf, err
 }
 
-func PersistConfigFile(config *spec.MerlinConfig, path string, name string) error {
+func PersistConfigFile(config *spec.Config, path string, name string) error {
 	b, err := yaml.Marshal(config)
 	if err != nil {
 		return err
@@ -35,4 +28,14 @@ func PersistConfigFile(config *spec.MerlinConfig, path string, name string) erro
 		return err
 	}
 	return nil
+}
+
+func GetSerivceFile(path string) (*spec.Service, error) {
+	cnf := &spec.Service{}
+	f, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	err = yaml.Unmarshal(f, cnf)
+	return cnf, err
 }
