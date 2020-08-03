@@ -1,37 +1,45 @@
+before:
+  hooks:
+    - go mod tidy
+
 builds:
-- env:
-  - CGO_ENABLED=0
+- 
   goos:
     - darwin
     - linux
+  env:
+  - CGO_ENABLED=0
   ldflags:
   - -X github.com/codefresh-io/merlin/cmd.version={{.Version}} -X github.com/codefresh-io/merlin/cmd.commit={{.Commit}} -X github.com/codefresh-io/merlin/cmd.date={{.Date}}
-archive:
+
+archives:
+- 
   replacements:
     darwin: Darwin
     linux: Linux
+    windows: Windows
     386: i386
     amd64: x86_64
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ .Tag }}-next"
-changelog:
-  sort: asc
-  filters:
-    exclude:
-    - '^docs:'
-    - '^test:'
-brew:
-  github:
-    owner: codefresh-io
-    name: homebrew-merlin
-  folder: Formula
-  description: "merlin --help"
-  homepage: "http://docs.codefresh.io"
-  commit_author:
-    name: Oleg Sucharevich
-    email: olegs@codefresh.io
+  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  format_overrides:
+  - goos: windows
+    format: zip
 
-  install: |
-      bin.install "merlin"
+
+brews:
+  -
+    name: merlin
+    tap:
+      owner: codefresh-io
+      name: homebrew-merli
+
+    commit_author:
+      name: Oleg Sucharevich
+      email: oleg2807@gmail.com 
+
+    folder: Formula
+    homepage: "http://docs.codefresh.io"
+    description: "merlin --help"
+
+    install: |
+        bin.install "merlin"
