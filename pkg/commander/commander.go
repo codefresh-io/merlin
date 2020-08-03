@@ -75,7 +75,7 @@ func (c *cmd) Run(context context.Context) error {
 	command.Stdout = c.stdout
 	command.Stdin = c.stdin
 	command.Stderr = c.stderr
-	c.logger.Debug("Starting command", "workdir", c.workDir, "program", c.program, "arguments", c.args, "envs", c.env)
+	c.logger.Debug("Starting command", "workdir", c.workDir, "cmd", command.String(), "envs", c.env)
 	err := command.Start()
 	if err != nil {
 		return err

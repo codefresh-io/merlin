@@ -79,6 +79,21 @@ var initCmd = &cobra.Command{
 		kubeContext := initCmdOpt.kubernetes.context
 		kubenamespace := getFromUserOrDie(logger, "Namespace", nil, name)
 		shell := getFromUserOrDie(logger, "What is your shell?", nil, "bash")
+
+		var debugStrategy *string
+		debugOnRandomPort := getFromUserOrDie(logger, "Use random port to debug(yes -> it using vscode)", []string{"yes", "no"}, "no")
+		if debugOnRandomPort == "yes" {
+			d := spec.PortGenerationStrategyRandom
+			debugStrategy = &d
+		}
+
+		var portfowardStrategy *string
+		forwardRandomPorts := getFromUserOrDie(logger, "Forward trafic to random ports(yes -> when using vscode)", []string{"yes", "no"}, "no")
+		if forwardRandomPorts == "yes" {
+			d := spec.PortGenerationStrategyRandom
+			portfowardStrategy = &d
+		}
+
 		cnf := &spec.Config{
 			Name: name,
 			Cluster: spec.Cluster{
@@ -87,6 +102,10 @@ var initCmd = &cobra.Command{
 				Path:      kubePath,
 			},
 			Shell: shell,
+			PortGenerationStrategy: spec.PortGenerationStrategy{
+				Debug:       debugStrategy,
+				PortForward: portfowardStrategy,
+			},
 		}
 		err = utils.PersistConfigFile(cnf, fmt.Sprintf("%s/.merlin", os.Getenv("HOME")), "config.yaml")
 		dieOnError("Failed to persist config file", err)

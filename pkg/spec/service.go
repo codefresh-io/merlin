@@ -2,8 +2,11 @@ package spec
 
 type (
 	Service struct {
-		Name        string   `yaml:"name"`
-		Ports       []Port   `yaml:"ports"`
+		Name  string `yaml:"name"`
+		Ports []Port `yaml:"ports"`
+		Debug struct {
+			Port Port `yaml:"port"`
+		} `yaml:"debug"`
 		Environment []EnvVar `yaml:"environment"`
 	}
 

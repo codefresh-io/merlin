@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/codefresh-io/go/logger"
 	"github.com/codefresh-io/merlin/pkg/commander"
+	"github.com/codefresh-io/merlin/pkg/spec"
 	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -47,8 +49,22 @@ var startCmd = &cobra.Command{
 		svc, err := utils.GetSerivceFile(path.Join(pwd, "service.yaml"))
 		dieOnError("Failed to read service.yaml file", err)
 
-		debug, err := utils.GetAvailablePort()
-		dieOnError("Failed to generate port for debug", err)
+		location := fmt.Sprintf("%s/.merlin/config.yaml", os.Getenv("HOME"))
+		cnf, err := getConfig(nil, location)
+		dieOnError("Failed to read environment config file", err)
+
+		debug := svc.Debug.Port.Default
+		if os.Getenv(svc.Debug.Port.EnvVar) != "" {
+			p, err := strconv.Atoi(os.Getenv(svc.Debug.Port.EnvVar))
+			dieOnError("Failed to conver port to number", err)
+			debug = p
+		}
+		if cnf.PortGenerationStrategy.Debug != nil && *cnf.PortGenerationStrategy.Debug == spec.PortGenerationStrategyRandom {
+			d, err := utils.GetAvailablePort()
+			dieOnError("Failed to generate port for debug", err)
+			debug = d
+		}
+
 		tpEnv := []string{
 			fmt.Sprintf("DEBUG_PORT=%d", debug),
 		}

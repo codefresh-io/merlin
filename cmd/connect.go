@@ -24,6 +24,7 @@ import (
 
 	"github.com/codefresh-io/go/logger"
 	"github.com/codefresh-io/merlin/pkg/commander"
+	"github.com/codefresh-io/merlin/pkg/spec"
 	"github.com/codefresh-io/merlin/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -55,15 +56,22 @@ var connectCmd = &cobra.Command{
 			"--context", cnf.Cluster.Context,
 			"--namespace", cnf.Cluster.Namespace,
 		}
-		if cnf.Shell != "" {
-			tpArgs = append(tpArgs, []string{"--run", cnf.Shell}...)
-		}
 		tpEnv := []string{}
 		for _, p := range svc.Ports {
-			port, err := utils.GetAvailablePort()
-			dieOnError("Failed to generate port", err)
+			port := p.Default
+			if cnf.PortGenerationStrategy.PortForward != nil && *cnf.PortGenerationStrategy.PortForward == spec.PortGenerationStrategyRandom {
+				logger.Debug("Generating random port", "name", p.Name)
+				p, err := utils.GetAvailablePort()
+				dieOnError("Failed to generate port", err)
+				port = p
+			}
 			tpArgs = append(tpArgs, []string{"--expose", fmt.Sprintf("%d:%d", port, p.Default)}...)
 			tpEnv = append(tpEnv, fmt.Sprintf("merlin_generated_%s=%d", p.EnvVar, port))
+		}
+
+		// --run should be the last argument
+		if cnf.Shell != "" {
+			tpArgs = append(tpArgs, []string{"--run", cnf.Shell}...)
 		}
 
 		for _, e := range svc.Environment {
