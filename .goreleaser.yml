@@ -31,7 +31,7 @@ brews:
     name: merlin
     tap:
       owner: codefresh-io
-      name: homebrew-merli
+      name: homebrew-merlin
 
     commit_author:
       name: Oleg Sucharevich
